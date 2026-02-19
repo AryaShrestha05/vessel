@@ -7,21 +7,76 @@ interface TerminalPanelProps {
   workspaceId: string
 }
 
+type DockSide = 'left' | 'right' | 'top' | 'bottom'
+
+function getDockSide(e: React.DragEvent, el: HTMLElement): DockSide | null {
+  const r = el.getBoundingClientRect()
+  const x = (e.clientX - r.left) / Math.max(1, r.width)
+  const y = (e.clientY - r.top) / Math.max(1, r.height)
+  const edge = 0.26
+
+  if (x <= edge) return 'left'
+  if (x >= 1 - edge) return 'right'
+  if (y <= edge) return 'top'
+  if (y >= 1 - edge) return 'bottom'
+  return null
+}
+
 export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   useTerminal(containerRef, terminalId)
   const [hovered, setHovered] = useState(false)
+  const [dockSide, setDockSide] = useState<DockSide | null>(null)
   const splitPane = useTerminalStore((s) => s.splitPane)
   const closePane = useTerminalStore((s) => s.closePane)
+  const dockTerminal = useTerminalStore((s) => s.dockTerminal)
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="w-full h-full relative"
+      onDragEnter={(e) => {
+        const payload = e.dataTransfer.types.includes('application/x-vessel-terminal')
+        if (!payload) return
+        const side = getDockSide(e, e.currentTarget)
+        setDockSide(side)
+      }}
+      onDragOver={(e) => {
+        const payload = e.dataTransfer.types.includes('application/x-vessel-terminal')
+        if (!payload) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        const side = getDockSide(e, e.currentTarget)
+        setDockSide(side)
+      }}
+      onDragLeave={(e) => {
+        const next = e.relatedTarget as Node | null
+        if (next && e.currentTarget.contains(next)) return
+        setDockSide(null)
+      }}
+      onDrop={(e) => {
+        const raw = e.dataTransfer.getData('application/x-vessel-terminal')
+        setDockSide(null)
+        if (!raw) return
+        e.preventDefault()
+        try {
+          const data = JSON.parse(raw) as { workspaceId: string; terminalId: string }
+          if (!data.workspaceId || !data.terminalId) return
+          const side = getDockSide(e, e.currentTarget)
+          if (!side) return
+          dockTerminal(data.workspaceId, data.terminalId, workspaceId, terminalId, side)
+        } catch {
+          // ignore
+        }
+      }}
+      className={`terminal-panel w-full h-full relative ${dockSide ? 'terminal-panel--docking' : ''}`}
       style={{ backgroundColor: 'var(--terminal-bg)' }}
     >
       <div ref={containerRef} className="w-full h-full overflow-hidden" />
+
+      {dockSide && (
+        <div className={`terminal-drop-hint terminal-drop-hint--${dockSide}`} />
+      )}
 
       {/* Floating toolbar */}
       <div

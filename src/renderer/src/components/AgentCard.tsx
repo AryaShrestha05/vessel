@@ -26,7 +26,18 @@ export function AgentCard({ workspace, compact = false }: AgentCardProps) {
   return (
     <div
       onClick={() => promoteAgent(workspace.id)}
-      className={`agent-card ${statusClass} cursor-pointer`}
+      draggable={workspace.terminalIds.length > 0}
+      onDragStart={(e) => {
+        e.stopPropagation()
+        const terminalId = workspace.terminalIds[0]
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData(
+          'application/x-vessel-terminal',
+          JSON.stringify({ workspaceId: workspace.id, terminalId })
+        )
+        e.dataTransfer.setData('text/plain', `${workspace.id}:${terminalId}`)
+      }}
+      className={`agent-card ${statusClass} cursor-grab active:cursor-grabbing`}
       style={{
         '--agent-hue': hue,
         '--status-color': statusColor,

@@ -4,6 +4,8 @@ import type { Workspace, SplitNode, AgentStatus } from '../types/terminal'
 import { AGENT_HUES } from '../types/terminal'
 import { cleanupPtyTracking } from '../hooks/use-terminal'
 
+type DockSide = 'left' | 'right' | 'top' | 'bottom'
+
 interface TerminalStore {
   workspaces: Workspace[]
   // The agent currently displayed on the Active Stage
@@ -15,6 +17,13 @@ interface TerminalStore {
   setAgentStatus: (id: string, status: AgentStatus) => void
   splitPane: (workspaceId: string, terminalId: string, direction: 'horizontal' | 'vertical') => void
   closePane: (workspaceId: string, terminalId: string) => void
+  dockTerminal: (
+    sourceWorkspaceId: string,
+    sourceTerminalId: string,
+    targetWorkspaceId: string,
+    targetTerminalId: string,
+    side: DockSide
+  ) => void
 }
 
 let nextColorIndex = 0
@@ -44,6 +53,18 @@ function removeFromTree(node: SplitNode, targetTerminalId: string): SplitNode | 
   if (left) return left
   if (right) return right
   return null
+}
+
+function splitWithIncoming(targetTerminalId: string, incomingTerminalId: string, side: DockSide): SplitNode {
+  const direction: 'horizontal' | 'vertical' = (side === 'left' || side === 'right') ? 'horizontal' : 'vertical'
+  const incomingLeaf: SplitNode = { type: 'leaf', terminalId: incomingTerminalId }
+  const targetLeaf: SplitNode = { type: 'leaf', terminalId: targetTerminalId }
+  const incomingFirst = side === 'left' || side === 'top'
+  return {
+    type: 'split' as const,
+    direction,
+    children: (incomingFirst ? [incomingLeaf, targetLeaf] : [targetLeaf, incomingLeaf]) as [SplitNode, SplitNode],
+  }
 }
 
 export const useTerminalStore = create<TerminalStore>((set) => ({
@@ -150,5 +171,53 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
         }
       })
     }))
-  }
+  },
+
+  dockTerminal: (sourceWorkspaceId, sourceTerminalId, targetWorkspaceId, targetTerminalId, side) => {
+    if (sourceWorkspaceId === targetWorkspaceId) return
+    if (sourceTerminalId === targetTerminalId) return
+
+    set((state) => {
+      const sourceWs = state.workspaces.find((w) => w.id === sourceWorkspaceId)
+      const targetWs = state.workspaces.find((w) => w.id === targetWorkspaceId)
+      if (!sourceWs || !targetWs) return state
+      if (!sourceWs.terminalIds.includes(sourceTerminalId)) return state
+      if (targetWs.terminalIds.includes(sourceTerminalId)) return state
+
+      const updated = state.workspaces.map((w) => {
+        if (w.id === sourceWorkspaceId) {
+          const prunedRoot = removeFromTree(w.root, sourceTerminalId)
+          if (!prunedRoot) {
+            const freshTerminalId = uuidv4()
+            return {
+              ...w,
+              root: { type: 'leaf' as const, terminalId: freshTerminalId },
+              terminalIds: [freshTerminalId],
+            }
+          }
+          return {
+            ...w,
+            root: prunedRoot,
+            terminalIds: w.terminalIds.filter((id) => id !== sourceTerminalId),
+          }
+        }
+
+        if (w.id === targetWorkspaceId) {
+          const newRoot = mapTree(w.root, targetTerminalId, () =>
+            splitWithIncoming(targetTerminalId, sourceTerminalId, side)
+          )
+          // If targetTerminalId wasn't found, mapTree will return the original tree unchanged.
+          // In that case, don't mutate terminalIds.
+          const changed = newRoot !== w.root
+          return changed
+            ? { ...w, root: newRoot, terminalIds: [...w.terminalIds, sourceTerminalId] }
+            : w
+        }
+
+        return w
+      })
+
+      return { ...state, workspaces: updated }
+    })
+  },
 }))
