@@ -9,12 +9,18 @@ import type { Workspace } from '../types/terminal'
 interface WorkspaceTileProps {
   workspace: Workspace
   isFocused: boolean
+  onFocus?: (workspaceId: string) => void
+  onUnfocus?: () => void
 }
 
-export function WorkspaceTile({ workspace, isFocused }: WorkspaceTileProps) {
-  const focusWorkspace = useTerminalStore((s) => s.focusWorkspace)
-  const unfocus = useTerminalStore((s) => s.unfocus)
+export function WorkspaceTile({ workspace, isFocused, onFocus, onUnfocus }: WorkspaceTileProps) {
+  const promoteAgent = useTerminalStore((s) => s.promoteAgent)
   const deleteWorkspace = useTerminalStore((s) => s.deleteWorkspace)
+
+  const focusWorkspace = (workspaceId: string) => {
+    onFocus?.(workspaceId)
+    if (!onFocus) promoteAgent(workspaceId)
+  }
 
   return (
     <div className="w-full h-full relative group" style={{ backgroundColor: 'var(--terminal-bg)' }}>
@@ -70,15 +76,15 @@ export function WorkspaceTile({ workspace, isFocused }: WorkspaceTileProps) {
       )}
 
       {/* Back button - only in focused mode */}
-      {isFocused && (
+      {isFocused && onUnfocus && (
         <button
-          onClick={unfocus}
+          onClick={onUnfocus}
           className="absolute top-2 left-2 z-20 glass rounded-lg px-3 py-1.5
                      text-xs font-medium cursor-pointer transition-all duration-200
                      opacity-0 group-hover:opacity-100 hover:scale-105"
-          style={{ color: 'var(--text-secondary)' }}
+          type="button"
         >
-          &#8592; Grid
+          <span className="text-secondary-glow">&#8592; Grid</span>
         </button>
       )}
     </div>

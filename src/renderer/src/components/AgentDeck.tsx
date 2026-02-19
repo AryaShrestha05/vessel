@@ -70,7 +70,7 @@ export function AgentDeck({ agents }: AgentDeckProps) {
                 <path d="M12 8v8M8 12h8" />
               </svg>
             </div>
-            <span className="text-[11px] mt-3" style={{ color: 'var(--text-tertiary)' }}>
+            <span className="text-[11px] mt-3 text-tertiary-glow">
               No background agents
             </span>
           </div>
