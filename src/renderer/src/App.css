@@ -84,18 +84,31 @@
   --terminal-bg: #0a0a0f;
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.5);
+
+  /* Dark theme: still bright, but not pure white */
+  --empty-state-fg: rgba(232, 232, 242, 0.92);
+  --empty-state-glow: 0 0 1px rgba(255, 255, 255, 0.55),
+    0 0 12px rgba(232, 232, 242, 0.42),
+    0 0 40px rgba(129, 140, 248, 0.26),
+    0 0 84px rgba(31, 105, 255, 0.14);
+
+  --motion-fast: 160ms;
+  --motion-med: 420ms;
+  --motion-slow: 900ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 [data-theme="light"] {
   --bg-primary: #f8f8fc;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f0f0f6;
-  --bg-surface: rgba(0, 0, 0, 0.03);
-  --bg-surface-hover: rgba(0, 0, 0, 0.05);
+  --bg-surface: rgba(0, 0, 0, 0.045);
+  --bg-surface-hover: rgba(0, 0, 0, 0.07);
   --bg-glass: rgba(255, 255, 255, 0.6);
   --bg-glass-hover: rgba(255, 255, 255, 0.8);
-  --border-primary: rgba(0, 0, 0, 0.08);
-  --border-secondary: rgba(0, 0, 0, 0.12);
+  --border-primary: rgba(0, 0, 0, 0.12);
+  --border-secondary: rgba(0, 0, 0, 0.18);
   --border-accent: rgba(99, 102, 241, 0.4);
   --text-primary: #0a0a0f;
   --text-secondary: #4b4b61;
@@ -112,6 +125,12 @@
   --terminal-bg: #1a1a25;
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.12);
+
+  /* Light theme: darker gray so it reads clearly */
+  --empty-state-fg: rgba(42, 42, 56, 0.92);
+  --empty-state-glow: 0 0 1px rgba(255, 255, 255, 0.85),
+    0 0 10px rgba(99, 102, 241, 0.18),
+    0 0 26px rgba(99, 102, 241, 0.1);
 }
 
 /* ============================================
@@ -126,6 +145,63 @@
 .text-tertiary-glow {
   color: var(--text-tertiary);
   text-shadow: var(--text-glow-tertiary);
+}
+
+/* ============================================
+   Motion defaults
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   Entrance animations (buttery)
+   ============================================ */
+
+.enter {
+  opacity: 0;
+  transform: translateY(14px) scale(0.985);
+  filter: blur(10px);
+  will-change: opacity, transform, filter;
+}
+
+.enter--in {
+  animation: enterIn 1100ms var(--ease-out) both;
+}
+
+.enter--1 { animation-delay: 0ms; }
+.enter--2 { animation-delay: 80ms; }
+.enter--3 { animation-delay: 160ms; }
+.enter--4 { animation-delay: 240ms; }
+
+.enter-item {
+  opacity: 0;
+  transform: translateY(10px) scale(0.99);
+  filter: blur(6px);
+  will-change: opacity, transform, filter;
+  animation: enterItem 900ms var(--ease-out) both;
+}
+
+@keyframes enterIn {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes enterItem {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
 }
 
 /* ============================================
@@ -226,25 +302,31 @@ body {
 }
 
 .titlebar-theme-btn {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
-  background: transparent;
-  border: none;
-  font-size: 13px;
-  color: var(--text-tertiary);
-  text-shadow: var(--text-glow-tertiary);
-  transition: color 0.15s, background-color 0.15s;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-primary);
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-shadow: var(--text-glow-secondary);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .titlebar-theme-btn:hover {
   color: var(--text-primary);
   text-shadow: none;
-  background-color: var(--bg-surface-hover);
+  background-color: var(--bg-glass-hover);
+  border-color: var(--border-secondary);
+  box-shadow: 0 12px 38px rgba(0, 0, 0, 0.28);
+  transform: scale(1.03);
 }
 
 /* ============================================
@@ -253,16 +335,19 @@ body {
 
 .empty-state-icon {
   font-size: 48px;
-  opacity: 0.06;
-  color: var(--text-primary);
+  opacity: 1;
+  color: var(--empty-state-fg);
+  text-shadow: var(--empty-state-glow);
   margin-bottom: 12px;
   font-family: 'Geist Mono', monospace;
 }
 
 .empty-state-text {
   font-size: 12px;
-  color: var(--text-tertiary);
-  text-shadow: var(--text-glow-tertiary);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--empty-state-fg);
+  text-shadow: var(--empty-state-glow);
 }
 
 /* ============================================
@@ -270,12 +355,21 @@ body {
    ============================================ */
 
 .sash-container .sash {
-  background-color: rgba(255, 255, 255, 0.06) !important;
-  transition: background-color 0.15s ease !important;
+  background-color: var(--border-primary) !important;
+  transition: background-color var(--motion-fast) var(--ease-out) !important;
 }
 
 .sash-container .sash:hover {
-  background-color: var(--accent) !important;
+  background-color: var(--border-secondary) !important;
+}
+
+/* Simple glass utility used in a few spots */
+.glass {
+  background: var(--bg-glass);
+  border: 1px solid var(--border-primary);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
 }
 
 /* ============================================
@@ -285,8 +379,10 @@ body {
 .agent-deck-sidebar {
   height: 100%;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 /* ============================================
@@ -297,7 +393,8 @@ body {
   position: relative;
   border-radius: 12px;
   overflow: hidden;
-  transition: box-shadow 0.3s ease;
+  transition: box-shadow var(--motion-med) var(--ease-out), transform var(--motion-med) var(--ease-out);
+  will-change: transform;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-primary);
 }
@@ -307,7 +404,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border-primary);
 }
 
@@ -331,8 +428,8 @@ body {
   gap: 6px;
   padding: 2px 10px;
   border-radius: 100px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
   font-size: 10px;
   font-weight: 500;
   color: var(--pill-color, var(--text-tertiary));
@@ -357,8 +454,8 @@ body {
   font-weight: 500;
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
   color: var(--text-tertiary);
   text-shadow: var(--text-glow-tertiary);
 }
@@ -403,14 +500,14 @@ body {
   display: flex;
   gap: 6px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-surface);
   border: 1px solid transparent;
   padding: 3px;
   transition: border-color 0.2s, background-color 0.2s;
 }
 
 .agent-deck-input-row:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-surface-hover);
 }
 
 .agent-deck-input-row.focused {
@@ -484,15 +581,19 @@ body {
 .agent-card {
   position: relative;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
   overflow: hidden;
-  transition: all 0.2s ease;
+  transition: transform var(--motion-fast) var(--ease-out),
+    background-color var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out);
+  will-change: transform;
 }
 
 .agent-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--bg-surface-hover);
+  border-color: var(--border-secondary);
   transform: translateY(-1px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }

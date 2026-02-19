@@ -76,8 +76,12 @@ export function AgentDeck({ agents }: AgentDeckProps) {
           </div>
         )}
 
-        {visibleAgents.map((agent) => (
-          <div key={agent.id} className="group animate-scale-in">
+        {visibleAgents.map((agent, index) => (
+          <div
+            key={agent.id}
+            className="group enter-item"
+            style={{ animationDelay: `${120 + index * 70}ms` }}
+          >
             <AgentCard workspace={agent} />
           </div>
         ))}
@@ -86,7 +90,7 @@ export function AgentDeck({ agents }: AgentDeckProps) {
         {deckAgents.length > 0 && (
           <div
             className="relative mt-4 pt-4"
-            style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+            style={{ borderTop: '1px solid var(--border-primary)' }}
             onMouseEnter={() => setDeckHovered(true)}
             onMouseLeave={() => setDeckHovered(false)}
           >

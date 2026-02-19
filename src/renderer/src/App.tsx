@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTerminalStore } from './store/terminal-store'
 import { useThemeStore } from './store/theme-store'
 import { ActiveStage } from './components/ActiveStage'
@@ -12,10 +12,16 @@ function App(): React.JSX.Element {
   const promoteAgent = useTerminalStore((s) => s.promoteAgent)
   const theme = useThemeStore((s) => s.theme)
   const toggleTheme = useThemeStore((s) => s.toggleTheme)
+  const [entered, setEntered] = useState(false)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setEntered(true), 60)
+    return () => window.clearTimeout(t)
+  }, [])
 
   // Cmd+K to cycle to next agent
   useEffect(() => {
@@ -56,7 +62,7 @@ function App(): React.JSX.Element {
       </div>
 
       {/* Titlebar */}
-      <div className="titlebar-drag-region h-[38px] shrink-0 flex items-center justify-between px-20">
+      <div className={`titlebar-drag-region h-[44px] shrink-0 flex items-center justify-between px-4 enter enter--1 ${entered ? 'enter--in' : ''}`}>
         <div />
         <span className="titlebar-label">
           Vessel
@@ -71,7 +77,7 @@ function App(): React.JSX.Element {
       </div>
 
       {/* Focus & Periphery Layout */}
-      <div className="flex-1 min-h-0 flex gap-4 p-4 pt-2">
+      <div className={`flex-1 min-h-0 flex gap-4 p-4 pt-2 enter enter--2 ${entered ? 'enter--in' : ''}`}>
         {/* Active Stage (~70%) - render ALL workspaces, toggle visibility */}
         <div className="flex-1 min-w-0 relative">
           {!hasWorkspaces && (
@@ -91,7 +97,7 @@ function App(): React.JSX.Element {
         </div>
 
         {/* Agent Deck Sidebar */}
-        <div className="agent-deck-sidebar shrink-0" style={{ width: 340 }}>
+        <div className={`agent-deck-sidebar shrink-0 enter enter--3 ${entered ? 'enter--in' : ''}`} style={{ width: 340 }}>
           <AgentDeck agents={sidebarAgents} />
         </div>
       </div>
