@@ -4,7 +4,6 @@ import { useThemeStore } from './store/theme-store'
 import { ActiveStage } from './components/ActiveStage'
 import { AgentDeck } from './components/AgentDeck'
 import { ColorBends } from './components/ColorBends'
-import GlassSurface from './components/GlassSurface'
 import '@xterm/xterm/css/xterm.css'
 
 function App(): React.JSX.Element {
@@ -42,17 +41,17 @@ function App(): React.JSX.Element {
       {/* Animated shader background */}
       <div className="colorbends-bg">
         <ColorBends
-          rotation={35}
-          speed={0.15}
-          colors={['#0f172a', '#1e1b4b', '#164e63', '#0c0a09']}
+          rotation={10}
+          speed={0.25}
+          colors={['#1f69ff', '#29cb10', '#f51414']}
           transparent
-          autoRotate={0.3}
-          scale={1.1}
-          frequency={0.8}
-          warpStrength={0.7}
+          autoRotate={0.05}
+          scale={1}
+          frequency={1}
+          warpStrength={1}
           mouseInfluence={0.3}
           parallax={0.4}
-          noise={0.3}
+          noise={0.5}
         />
       </div>
 
@@ -91,21 +90,10 @@ function App(): React.JSX.Element {
           ))}
         </div>
 
-        {/* Agent Deck Sidebar - Liquid Glass */}
-        <GlassSurface
-          width="340px"
-          height="100%"
-          borderRadius={14}
-          blur={20}
-          brightness={30}
-          opacity={0.6}
-          backgroundOpacity={0.02}
-          saturation={1.6}
-          borderWidth={0.03}
-          className="shrink-0"
-        >
+        {/* Agent Deck Sidebar */}
+        <div className="agent-deck-sidebar shrink-0" style={{ width: 340 }}>
           <AgentDeck agents={sidebarAgents} />
-        </GlassSurface>
+        </div>
       </div>
     </div>
   )

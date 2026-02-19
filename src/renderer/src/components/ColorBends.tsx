@@ -1,6 +1,9 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
+import * as THREE from 'three'
 
 interface ColorBendsProps {
+  className?: string
+  style?: React.CSSProperties
   rotation?: number
   speed?: number
   colors?: string[]
@@ -14,301 +17,299 @@ interface ColorBendsProps {
   noise?: number
 }
 
-const VERTEX_SHADER = `
-  attribute vec2 a_position;
-  void main() {
-    gl_Position = vec4(a_position, 0.0, 1.0);
-  }
-`
+const MAX_COLORS = 8
 
-const FRAGMENT_SHADER = `
-  precision highp float;
+const frag = `
+#define MAX_COLORS ${MAX_COLORS}
+uniform vec2 uCanvas;
+uniform float uTime;
+uniform float uSpeed;
+uniform vec2 uRot;
+uniform int uColorCount;
+uniform vec3 uColors[MAX_COLORS];
+uniform int uTransparent;
+uniform float uScale;
+uniform float uFrequency;
+uniform float uWarpStrength;
+uniform vec2 uPointer;
+uniform float uMouseInfluence;
+uniform float uParallax;
+uniform float uNoise;
+varying vec2 vUv;
 
-  uniform vec2 u_resolution;
-  uniform float u_time;
-  uniform float u_rotation;
-  uniform float u_speed;
-  uniform float u_scale;
-  uniform float u_frequency;
-  uniform float u_warpStrength;
-  uniform float u_noise;
-  uniform float u_autoRotate;
-  uniform float u_mouseInfluence;
-  uniform float u_parallax;
-  uniform vec2 u_mouse;
-  uniform vec3 u_colors[4];
-  uniform int u_colorCount;
-  uniform float u_transparent;
+void main() {
+  float t = uTime * uSpeed;
+  vec2 p = vUv * 2.0 - 1.0;
+  p += uPointer * uParallax * 0.1;
+  vec2 rp = vec2(p.x * uRot.x - p.y * uRot.y, p.x * uRot.y + p.y * uRot.x);
+  vec2 q = vec2(rp.x * (uCanvas.x / uCanvas.y), rp.y);
+  q /= max(uScale, 0.0001);
+  q /= 0.5 + 0.2 * dot(q, q);
+  q += 0.2 * cos(t) - 7.56;
+  vec2 toward = (uPointer - rp);
+  q += toward * uMouseInfluence * 0.2;
 
-  // Simplex-style noise
-  vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-  vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-  vec3 permute(vec3 x) { return mod289(((x * 34.0) + 1.0) * x); }
+    vec3 col = vec3(0.0);
+    float a = 1.0;
 
-  float snoise(vec2 v) {
-    const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-                       -0.577350269189626, 0.024390243902439);
-    vec2 i  = floor(v + dot(v, C.yy));
-    vec2 x0 = v - i + dot(i, C.xx);
-    vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-    vec4 x12 = x0.xyxy + C.xxzz;
-    x12.xy -= i1;
-    i = mod289(i);
-    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0))
-                            + i.x + vec3(0.0, i1.x, 1.0));
-    vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy),
-                             dot(x12.zw, x12.zw)), 0.0);
-    m = m * m;
-    m = m * m;
-    vec3 x = 2.0 * fract(p * C.www) - 1.0;
-    vec3 h = abs(x) - 0.5;
-    vec3 ox = floor(x + 0.5);
-    vec3 a0 = x - ox;
-    m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
-    vec3 g;
-    g.x = a0.x * x0.x + h.x * x0.y;
-    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-    return 130.0 * dot(m, g);
-  }
-
-  float fbm(vec2 p) {
-    float value = 0.0;
-    float amp = 0.5;
-    for (int i = 0; i < 4; i++) {
-      value += amp * snoise(p);
-      p *= 2.0;
-      amp *= 0.5;
-    }
-    return value;
-  }
-
-  void main() {
-    vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec2 center = uv - 0.5;
-
-    // Mouse parallax offset
-    vec2 mouseOffset = (u_mouse - 0.5) * u_mouseInfluence * u_parallax;
-    center -= mouseOffset;
-
-    // Apply rotation (base + auto)
-    float rot = radians(u_rotation) + u_autoRotate * u_time * 0.5;
-    float cr = cos(rot);
-    float sr = sin(rot);
-    center = mat2(cr, -sr, sr, cr) * center;
-
-    // Scale
-    center *= u_scale;
-
-    // Time
-    float t = u_time * u_speed;
-
-    // Warp distortion using noise
-    vec2 warp = vec2(
-      fbm(center * u_frequency + t * 0.3),
-      fbm(center * u_frequency + t * 0.3 + 43.0)
-    );
-    center += warp * u_warpStrength * 0.4;
-
-    // Additional noise layer
-    float n = fbm(center * u_frequency * 1.5 + t * 0.2) * u_noise;
-
-    // Color mixing based on warped position
-    float angle = atan(center.y, center.x) / 6.28318 + 0.5;
-    float dist = length(center);
-
-    // Blend factor using angle + distance + noise
-    float blend = angle + dist * 0.5 + n * 0.3 + t * 0.05;
-    blend = fract(blend);
-
-    // Mix colors smoothly
-    vec3 col;
-    if (u_colorCount <= 1) {
-      col = u_colors[0];
-    } else if (u_colorCount == 2) {
-      col = mix(u_colors[0], u_colors[1], smoothstep(0.0, 1.0, blend));
-    } else if (u_colorCount == 3) {
-      float seg = blend * 3.0;
-      if (seg < 1.0) col = mix(u_colors[0], u_colors[1], smoothstep(0.0, 1.0, seg));
-      else if (seg < 2.0) col = mix(u_colors[1], u_colors[2], smoothstep(0.0, 1.0, seg - 1.0));
-      else col = mix(u_colors[2], u_colors[0], smoothstep(0.0, 1.0, seg - 2.0));
+    if (uColorCount > 0) {
+      vec2 s = q;
+      vec3 sumCol = vec3(0.0);
+      float cover = 0.0;
+      for (int i = 0; i < MAX_COLORS; ++i) {
+            if (i >= uColorCount) break;
+            s -= 0.01;
+            vec2 r = sin(1.5 * (s.yx * uFrequency) + 2.0 * cos(s * uFrequency));
+            float m0 = length(r + sin(5.0 * r.y * uFrequency - 3.0 * t + float(i)) / 4.0);
+            float kBelow = clamp(uWarpStrength, 0.0, 1.0);
+            float kMix = pow(kBelow, 0.3);
+            float gain = 1.0 + max(uWarpStrength - 1.0, 0.0);
+            vec2 disp = (r - s) * kBelow;
+            vec2 warped = s + disp * gain;
+            float m1 = length(warped + sin(5.0 * warped.y * uFrequency - 3.0 * t + float(i)) / 4.0);
+            float m = mix(m0, m1, kMix);
+            float w = 1.0 - exp(-6.0 / exp(6.0 * m));
+            sumCol += uColors[i] * w;
+            cover = max(cover, w);
+      }
+      col = clamp(sumCol, 0.0, 1.0);
+      a = uTransparent > 0 ? cover : 1.0;
     } else {
-      float seg = blend * 4.0;
-      if (seg < 1.0) col = mix(u_colors[0], u_colors[1], smoothstep(0.0, 1.0, seg));
-      else if (seg < 2.0) col = mix(u_colors[1], u_colors[2], smoothstep(0.0, 1.0, seg - 1.0));
-      else if (seg < 3.0) col = mix(u_colors[2], u_colors[3], smoothstep(0.0, 1.0, seg - 2.0));
-      else col = mix(u_colors[3], u_colors[0], smoothstep(0.0, 1.0, seg - 3.0));
+        vec2 s = q;
+        for (int k = 0; k < 3; ++k) {
+            s -= 0.01;
+            vec2 r = sin(1.5 * (s.yx * uFrequency) + 2.0 * cos(s * uFrequency));
+            float m0 = length(r + sin(5.0 * r.y * uFrequency - 3.0 * t + float(k)) / 4.0);
+            float kBelow = clamp(uWarpStrength, 0.0, 1.0);
+            float kMix = pow(kBelow, 0.3);
+            float gain = 1.0 + max(uWarpStrength - 1.0, 0.0);
+            vec2 disp = (r - s) * kBelow;
+            vec2 warped = s + disp * gain;
+            float m1 = length(warped + sin(5.0 * warped.y * uFrequency - 3.0 * t + float(k)) / 4.0);
+            float m = mix(m0, m1, kMix);
+            col[k] = 1.0 - exp(-6.0 / exp(6.0 * m));
+        }
+        a = uTransparent > 0 ? max(max(col.r, col.g), col.b) : 1.0;
     }
 
-    // Add subtle depth variation
-    float depth = smoothstep(0.0, 1.5, dist);
-    col *= 1.0 - depth * 0.3;
+    if (uNoise > 0.0001) {
+      float n = fract(sin(dot(gl_FragCoord.xy + vec2(uTime), vec2(12.9898, 78.233))) * 43758.5453123);
+      col += (n - 0.5) * uNoise;
+      col = clamp(col, 0.0, 1.0);
+    }
 
-    float alpha = u_transparent > 0.5 ? 0.85 - depth * 0.2 : 1.0;
-
-    gl_FragColor = vec4(col, alpha);
-  }
+    vec3 rgb = (uTransparent > 0) ? col * a : col;
+    gl_FragColor = vec4(rgb, a);
+}
 `
 
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace('#', '')
-  return [
-    parseInt(h.substring(0, 2), 16) / 255,
-    parseInt(h.substring(2, 4), 16) / 255,
-    parseInt(h.substring(4, 6), 16) / 255,
-  ]
+const vert = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = vec4(position, 1.0);
 }
+`
 
 export function ColorBends({
-  rotation = 0,
+  className = '',
+  style,
+  rotation = 45,
   speed = 0.2,
-  colors = ['#f47710', '#000000', '#b81fff', '#de560d'],
-  transparent = false,
+  colors = [],
+  transparent = true,
   autoRotate = 0,
-  scale = 1.3,
+  scale = 1,
   frequency = 1,
   warpStrength = 1,
-  mouseInfluence = 0.5,
+  mouseInfluence = 1,
   parallax = 0.5,
-  noise = 0.25,
+  noise = 0.1,
 }: ColorBendsProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const glRef = useRef<WebGLRenderingContext | null>(null)
-  const programRef = useRef<WebGLProgram | null>(null)
-  const animRef = useRef<number>(0)
-  const mouseRef = useRef<[number, number]>([0.5, 0.5])
-  const startTimeRef = useRef<number>(Date.now())
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    mouseRef.current = [
-      (e.clientX - rect.left) / rect.width,
-      1.0 - (e.clientY - rect.top) / rect.height,
-    ]
-  }, [])
+  const containerRef = useRef<HTMLDivElement>(null)
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
+  const rafRef = useRef<number | null>(null)
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null)
+  const resizeObserverRef = useRef<ResizeObserver | null>(null)
+  const rotationRef = useRef(rotation)
+  const autoRotateRef = useRef(autoRotate)
+  const pointerTargetRef = useRef(new THREE.Vector2(0, 0))
+  const pointerCurrentRef = useRef(new THREE.Vector2(0, 0))
+  const pointerSmoothRef = useRef(8)
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
+    const container = containerRef.current
+    if (!container) return
 
-    const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false })
-    if (!gl) return
-    glRef.current = gl
+    const scene = new THREE.Scene()
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
 
-    // Compile shaders
-    const vs = gl.createShader(gl.VERTEX_SHADER)!
-    gl.shaderSource(vs, VERTEX_SHADER)
-    gl.compileShader(vs)
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    const uColorsArray = Array.from({ length: MAX_COLORS }, () => new THREE.Vector3(0, 0, 0))
+    const material = new THREE.ShaderMaterial({
+      vertexShader: vert,
+      fragmentShader: frag,
+      uniforms: {
+        uCanvas: { value: new THREE.Vector2(1, 1) },
+        uTime: { value: 0 },
+        uSpeed: { value: speed },
+        uRot: { value: new THREE.Vector2(1, 0) },
+        uColorCount: { value: 0 },
+        uColors: { value: uColorsArray },
+        uTransparent: { value: transparent ? 1 : 0 },
+        uScale: { value: scale },
+        uFrequency: { value: frequency },
+        uWarpStrength: { value: warpStrength },
+        uPointer: { value: new THREE.Vector2(0, 0) },
+        uMouseInfluence: { value: mouseInfluence },
+        uParallax: { value: parallax },
+        uNoise: { value: noise },
+      },
+      premultipliedAlpha: true,
+      transparent: true,
+    })
+    materialRef.current = material
 
-    const fs = gl.createShader(gl.FRAGMENT_SHADER)!
-    gl.shaderSource(fs, FRAGMENT_SHADER)
-    gl.compileShader(fs)
+    const mesh = new THREE.Mesh(geometry, material)
+    scene.add(mesh)
 
-    const program = gl.createProgram()!
-    gl.attachShader(program, vs)
-    gl.attachShader(program, fs)
-    gl.linkProgram(program)
-    gl.useProgram(program)
-    programRef.current = program
+    const renderer = new THREE.WebGLRenderer({
+      antialias: false,
+      powerPreference: 'high-performance',
+      alpha: true,
+    })
+    rendererRef.current = renderer
+    renderer.outputColorSpace = THREE.SRGBColorSpace
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    renderer.setClearColor(0x000000, transparent ? 0 : 1)
+    renderer.domElement.style.width = '100%'
+    renderer.domElement.style.height = '100%'
+    renderer.domElement.style.display = 'block'
+    container.appendChild(renderer.domElement)
 
-    // Full-screen quad
-    const buffer = gl.createBuffer()
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      -1, -1, 1, -1, -1, 1,
-      -1, 1, 1, -1, 1, 1,
-    ]), gl.STATIC_DRAW)
+    const clock = new THREE.Clock()
 
-    const posLoc = gl.getAttribLocation(program, 'a_position')
-    gl.enableVertexAttribArray(posLoc)
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
-
-    if (transparent) {
-      gl.enable(gl.BLEND)
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+    const handleResize = () => {
+      const w = container.clientWidth || 1
+      const h = container.clientHeight || 1
+      renderer.setSize(w, h, false)
+      material.uniforms.uCanvas.value.set(w, h)
     }
 
-    window.addEventListener('mousemove', handleMouseMove)
+    handleResize()
 
-    // Set static uniforms
-    const setUniform1f = (name: string, v: number) => {
-      const loc = gl.getUniformLocation(program, name)
-      if (loc) gl.uniform1f(loc, v)
-    }
-    const setUniform1i = (name: string, v: number) => {
-      const loc = gl.getUniformLocation(program, name)
-      if (loc) gl.uniform1i(loc, v)
+    if ('ResizeObserver' in window) {
+      const ro = new ResizeObserver(handleResize)
+      ro.observe(container)
+      resizeObserverRef.current = ro
+    } else {
+      window.addEventListener('resize', handleResize)
     }
 
-    setUniform1f('u_rotation', rotation)
-    setUniform1f('u_speed', speed)
-    setUniform1f('u_scale', scale)
-    setUniform1f('u_frequency', frequency)
-    setUniform1f('u_warpStrength', warpStrength)
-    setUniform1f('u_noise', noise)
-    setUniform1f('u_autoRotate', autoRotate)
-    setUniform1f('u_mouseInfluence', mouseInfluence)
-    setUniform1f('u_parallax', parallax)
-    setUniform1f('u_transparent', transparent ? 1.0 : 0.0)
+    const loop = () => {
+      const dt = clock.getDelta()
+      const elapsed = clock.elapsedTime
+      material.uniforms.uTime.value = elapsed
 
-    const colorValues = colors.slice(0, 4).map(hexToRgb)
-    setUniform1i('u_colorCount', colorValues.length)
-    for (let i = 0; i < 4; i++) {
-      const c = colorValues[i] || [0, 0, 0]
-      const loc = gl.getUniformLocation(program, `u_colors[${i}]`)
-      if (loc) gl.uniform3f(loc, c[0], c[1], c[2])
+      const deg = (rotationRef.current % 360) + autoRotateRef.current * elapsed
+      const rad = (deg * Math.PI) / 180
+      const c = Math.cos(rad)
+      const s = Math.sin(rad)
+      material.uniforms.uRot.value.set(c, s)
+
+      const cur = pointerCurrentRef.current
+      const tgt = pointerTargetRef.current
+      const amt = Math.min(1, dt * pointerSmoothRef.current)
+      cur.lerp(tgt, amt)
+      material.uniforms.uPointer.value.copy(cur)
+      renderer.render(scene, camera)
+      rafRef.current = requestAnimationFrame(loop)
     }
-
-    startTimeRef.current = Date.now()
-
-    // Resize handler
-    const resize = () => {
-      const dpr = window.devicePixelRatio || 1
-      const w = canvas.clientWidth
-      const h = canvas.clientHeight
-      canvas.width = w * dpr
-      canvas.height = h * dpr
-      gl.viewport(0, 0, canvas.width, canvas.height)
-    }
-
-    const ro = new ResizeObserver(resize)
-    ro.observe(canvas)
-    resize()
-
-    // Render loop
-    const render = () => {
-      const t = (Date.now() - startTimeRef.current) / 1000
-
-      const resLoc = gl.getUniformLocation(program, 'u_resolution')
-      if (resLoc) gl.uniform2f(resLoc, canvas.width, canvas.height)
-
-      const timeLoc = gl.getUniformLocation(program, 'u_time')
-      if (timeLoc) gl.uniform1f(timeLoc, t)
-
-      const mouseLoc = gl.getUniformLocation(program, 'u_mouse')
-      if (mouseLoc) gl.uniform2f(mouseLoc, mouseRef.current[0], mouseRef.current[1])
-
-      gl.drawArrays(gl.TRIANGLES, 0, 6)
-      animRef.current = requestAnimationFrame(render)
-    }
-    animRef.current = requestAnimationFrame(render)
+    rafRef.current = requestAnimationFrame(loop)
 
     return () => {
-      cancelAnimationFrame(animRef.current)
-      window.removeEventListener('mousemove', handleMouseMove)
-      ro.disconnect()
-      gl.deleteProgram(program)
-      gl.deleteShader(vs)
-      gl.deleteShader(fs)
-      gl.deleteBuffer(buffer)
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      if (resizeObserverRef.current) resizeObserverRef.current.disconnect()
+      else window.removeEventListener('resize', handleResize)
+      geometry.dispose()
+      material.dispose()
+      renderer.dispose()
+      if (renderer.domElement && renderer.domElement.parentElement === container) {
+        container.removeChild(renderer.domElement)
+      }
     }
-  }, [rotation, speed, colors, transparent, autoRotate, scale, frequency, warpStrength, mouseInfluence, parallax, noise, handleMouseMove])
+  }, [frequency, mouseInfluence, noise, parallax, scale, speed, transparent, warpStrength])
+
+  useEffect(() => {
+    const material = materialRef.current
+    const renderer = rendererRef.current
+    if (!material) return
+
+    rotationRef.current = rotation
+    autoRotateRef.current = autoRotate
+    material.uniforms.uSpeed.value = speed
+    material.uniforms.uScale.value = scale
+    material.uniforms.uFrequency.value = frequency
+    material.uniforms.uWarpStrength.value = warpStrength
+    material.uniforms.uMouseInfluence.value = mouseInfluence
+    material.uniforms.uParallax.value = parallax
+    material.uniforms.uNoise.value = noise
+
+    const toVec3 = (hex: string) => {
+      const h = hex.replace('#', '').trim()
+      const v =
+        h.length === 3
+          ? [parseInt(h[0] + h[0], 16), parseInt(h[1] + h[1], 16), parseInt(h[2] + h[2], 16)]
+          : [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
+      return new THREE.Vector3(v[0] / 255, v[1] / 255, v[2] / 255)
+    }
+
+    const arr = (colors || []).filter(Boolean).slice(0, MAX_COLORS).map(toVec3)
+    for (let i = 0; i < MAX_COLORS; i++) {
+      const vec = material.uniforms.uColors.value[i]
+      if (i < arr.length) vec.copy(arr[i])
+      else vec.set(0, 0, 0)
+    }
+    material.uniforms.uColorCount.value = arr.length
+
+    material.uniforms.uTransparent.value = transparent ? 1 : 0
+    if (renderer) renderer.setClearColor(0x000000, transparent ? 0 : 1)
+  }, [
+    rotation,
+    autoRotate,
+    speed,
+    scale,
+    frequency,
+    warpStrength,
+    mouseInfluence,
+    parallax,
+    noise,
+    colors,
+    transparent,
+  ])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const rect = container.getBoundingClientRect()
+      const x = ((e.clientX - rect.left) / (rect.width || 1)) * 2 - 1
+      const y = -(((e.clientY - rect.top) / (rect.height || 1)) * 2 - 1)
+      pointerTargetRef.current.set(x, y)
+    }
+
+    container.addEventListener('pointermove', handlePointerMove)
+    return () => {
+      container.removeEventListener('pointermove', handlePointerMove)
+    }
+  }, [])
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="colorbends-canvas"
+    <div
+      ref={containerRef}
+      className={`color-bends-container ${className}`}
+      style={style}
     />
   )
 }
