@@ -28,9 +28,9 @@ export function AgentDeck({ agents }: AgentDeckProps) {
   const deckAgents = hasOverflow ? agents.slice(VISIBLE_CARD_LIMIT) : []
 
   return (
-    <div className="agent-deck h-full flex flex-col">
+    <div className="agent-deck h-full flex flex-col px-5">
       {/* Title */}
-      <div className="shrink-0 flex items-center justify-center pt-10 pb-8">
+      <div className="shrink-0 flex items-center justify-center pt-6 pb-5">
         <h2 className="agent-deck-title">
           Agents
           {agents.length > 0 && (
@@ -40,7 +40,7 @@ export function AgentDeck({ agents }: AgentDeckProps) {
       </div>
 
       {/* Create input */}
-      <div className="shrink-0 px-5 pb-6">
+      <div className="shrink-0 pb-5">
         <div className={`agent-deck-input-row ${inputFocused ? 'focused' : ''}`}>
           <input
             type="text"
@@ -61,7 +61,7 @@ export function AgentDeck({ agents }: AgentDeckProps) {
       </div>
 
       {/* Agent list */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-5 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-5 space-y-4">
         {agents.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="agent-deck-empty-icon">

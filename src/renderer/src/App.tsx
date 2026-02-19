@@ -71,7 +71,7 @@ function App(): React.JSX.Element {
       </div>
 
       {/* Focus & Periphery Layout */}
-      <div className="flex-1 min-h-0 flex gap-2 p-2 pt-0">
+      <div className="flex-1 min-h-0 flex gap-4 p-4 pt-2">
         {/* Active Stage (~70%) - render ALL workspaces, toggle visibility */}
         <div className="flex-1 min-w-0 relative">
           {!hasWorkspaces && (

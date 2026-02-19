@@ -54,7 +54,7 @@ export function AgentCard({ workspace, compact = false }: AgentCardProps) {
       )}
 
       {/* Info bar */}
-      <div className={compact ? 'py-2.5 px-3.5' : 'px-3.5 py-3'}>
+      <div className={compact ? 'py-3 px-4' : 'px-4 py-4'}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             {/* Left accent dot */}

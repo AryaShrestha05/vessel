@@ -29,7 +29,7 @@ export function ActiveStage({ workspace, visible }: ActiveStageProps) {
       } as React.CSSProperties}
     >
       {/* Header */}
-      <div className="active-stage-header">
+      <div className="active-stage-header px-5 py-3.5">
         <div className="flex items-center gap-3">
           <div className="active-stage-dot" style={{ backgroundColor: hue }} />
           <span className="active-stage-name">
