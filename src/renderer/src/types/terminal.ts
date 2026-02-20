@@ -72,4 +72,5 @@ export interface Workspace {
   terminalIds: string[] // list of all terminal IDs in this workspace
   status: AgentStatus   // current agent status
   colorId: number       // index into AGENT_HUES for unique border hue
+  pinned: boolean       // pinned agents stay at the top and never overflow
 }

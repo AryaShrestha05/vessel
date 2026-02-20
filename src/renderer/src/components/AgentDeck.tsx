@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { Workspace } from '../types/terminal'
 import { AgentCard } from './AgentCard'
+import { CreateAgentMenu } from './CreateAgentMenu'
 import { useTerminalStore } from '../store/terminal-store'
 import { AGENT_HUES } from '../types/terminal'
 
@@ -15,6 +16,7 @@ export function AgentDeck({ agents }: AgentDeckProps) {
   const createWorkspace = useTerminalStore((s) => s.createWorkspace)
   const [newName, setNewName] = useState('')
   const [inputFocused, setInputFocused] = useState(false)
+  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null)
 
   const handleCreate = () => {
     const name = newName.trim()
@@ -23,9 +25,21 @@ export function AgentDeck({ agents }: AgentDeckProps) {
     setNewName('')
   }
 
-  const hasOverflow = agents.length > VISIBLE_CARD_LIMIT
-  const visibleAgents = hasOverflow ? agents.slice(0, VISIBLE_CARD_LIMIT) : agents
-  const deckAgents = hasOverflow ? agents.slice(VISIBLE_CARD_LIMIT) : []
+  const handleRightClickAdd = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setMenuAnchor({ x: rect.right, y: rect.bottom + 6 })
+  }, [])
+
+  const closeMenu = useCallback(() => setMenuAnchor(null), [])
+
+  // Pinned agents always stay visible at the top, never overflow
+  const pinned = agents.filter((a) => a.pinned)
+  const unpinned = agents.filter((a) => !a.pinned)
+  const unpinnedLimit = Math.max(0, VISIBLE_CARD_LIMIT - pinned.length)
+  const hasOverflow = unpinned.length > unpinnedLimit
+  const visibleAgents = [...pinned, ...(hasOverflow ? unpinned.slice(0, unpinnedLimit) : unpinned)]
+  const deckAgents = hasOverflow ? unpinned.slice(unpinnedLimit) : []
 
   return (
     <div className="agent-deck h-full flex flex-col px-5">
@@ -52,13 +66,31 @@ export function AgentDeck({ agents }: AgentDeckProps) {
             placeholder="New agent..."
             className="agent-deck-input"
           />
-          <button onClick={handleCreate} className="agent-deck-add-btn">
+          <button
+            onClick={handleCreate}
+            onContextMenu={handleRightClickAdd}
+            className="agent-deck-add-btn"
+            title="Left-click: quick create · Right-click: options"
+          >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
           </button>
         </div>
       </div>
+
+      {/* Right-click create menu */}
+      {menuAnchor && (
+        <CreateAgentMenu
+          anchor={menuAnchor}
+          initialName={newName}
+          onClose={closeMenu}
+          onCreated={() => {
+            setNewName('')
+            closeMenu()
+          }}
+        />
+      )}
 
       {/* Agent list */}
       <div className="flex-1 min-h-0 overflow-y-auto pb-5 space-y-4">

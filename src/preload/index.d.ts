@@ -10,6 +10,7 @@ interface TerminalAPI {
   destroy(id: string): void
   onData(callback: (id: string, data: string) => void): () => void
   onExit(callback: (id: string, exitCode: number) => void): () => void
+  pickDirectory(): Promise<string | null>
 }
 
 declare global {

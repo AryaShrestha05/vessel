@@ -89,5 +89,12 @@ contextBridge.exposeInMainWorld('terminalAPI', {
     return () => {
       ipcRenderer.removeListener('pty:exit', handler)
     }
+  },
+
+  // --- PICK DIRECTORY ---
+  // Open the native OS directory picker dialog.
+  // Returns the selected path, or null if cancelled.
+  pickDirectory: (): Promise<string | null> => {
+    return ipcRenderer.invoke('dialog:openDirectory')
   }
 })
