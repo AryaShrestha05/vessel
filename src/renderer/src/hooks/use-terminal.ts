@@ -3,7 +3,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { WebLinksAddon } from '@xterm/addon-web-links'
-import { deleteTerminalBuffer } from './use-terminal-buffer'
+import { getTerminalBuffer, deleteTerminalBuffer } from './use-terminal-buffer'
 import { ingestTerminalOutput } from './use-terminal-meta'
 
 // Track which PTY sessions have been created so we don't re-create on remount
@@ -87,6 +87,13 @@ export function useTerminal(
     requestAnimationFrame(() => {
       fitAddon.fit()
     })
+
+    // Replay buffered output so the terminal shows its history on remount
+    // (e.g. after floating/docking the pane). On first mount this is a no-op.
+    const buffer = getTerminalBuffer(terminalId)
+    for (const chunk of buffer) {
+      term.write(chunk)
+    }
 
     termRef.current = term
     fitAddonRef.current = fitAddon

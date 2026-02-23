@@ -28,6 +28,17 @@ function App(): React.JSX.Element {
     return () => window.clearTimeout(t)
   }, [])
 
+  // Auto-open the sidebar whenever a terminal pane drag starts so the drop zone is reachable
+  useEffect(() => {
+    const onDragStart = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('application/x-vessel-terminal')) {
+        setAgentsOpen(true)
+      }
+    }
+    window.addEventListener('dragstart', onDragStart)
+    return () => window.removeEventListener('dragstart', onDragStart)
+  }, [setAgentsOpen])
+
   // Cmd+K to cycle to next agent
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -90,12 +101,11 @@ function App(): React.JSX.Element {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className={`titlebar-agents-btn ${agentsOpen ? '' : 'titlebar-agents-btn--quiet'}`}
-            onClick={toggleSidebar}
-            title={agentsOpen ? 'Hide agents' : 'Show agents'}
+            onClick={toggleTheme}
+            className="titlebar-theme-btn"
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
           >
-            Agents
-            <span className="titlebar-agents-count">{backgroundCount}</span>
+            {theme === 'dark' ? '\u2600' : '\u263E'}
           </button>
         </div>
         <span className="titlebar-label">
@@ -103,11 +113,23 @@ function App(): React.JSX.Element {
         </span>
         <div className="flex items-center gap-2">
           <button
-            onClick={toggleTheme}
-            className="titlebar-theme-btn"
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            type="button"
+            className="titlebar-menu-btn"
+            onClick={toggleSidebar}
+            title={agentsOpen ? 'Hide agents' : 'Show agents'}
           >
-            {theme === 'dark' ? '\u2600' : '\u263E'}
+            {agentsOpen ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M3 4.5h10M3 8h10M3 11.5h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            )}
+            {backgroundCount > 0 && (
+              <span className="titlebar-menu-badge" aria-hidden="true">{backgroundCount}</span>
+            )}
           </button>
         </div>
       </div>

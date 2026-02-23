@@ -7,6 +7,18 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 //                      We don't actually use the event data, but the callback
 //                      receives it as the first argument, so we need the type.
 
+// Keep a single IPC listener per channel, fan out to subscribers.
+const dataSubscribers = new Set<(id: string, data: string) => void>()
+const exitSubscribers = new Set<(id: string, exitCode: number) => void>()
+
+ipcRenderer.on('pty:data', (_event: IpcRendererEvent, { id, data }: { id: string; data: string }) => {
+  for (const fn of dataSubscribers) fn(id, data)
+})
+
+ipcRenderer.on('pty:exit', (_event: IpcRendererEvent, { id, exitCode }: { id: string; exitCode: number }) => {
+  for (const fn of exitSubscribers) fn(id, exitCode)
+})
+
 contextBridge.exposeInMainWorld('terminalAPI', {
 
   // --- CREATE ---
@@ -68,13 +80,9 @@ contextBridge.exposeInMainWorld('terminalAPI', {
   //   // later, to stop listening:
   //   unsubscribe()
   onData: (callback: (id: string, data: string) => void) => {
-    const handler = (_event: IpcRendererEvent, { id, data }: { id: string; data: string }) => {
-      callback(id, data)
-    }
-    ipcRenderer.on('pty:data', handler)
-    // Return a function that removes this listener
+    dataSubscribers.add(callback)
     return () => {
-      ipcRenderer.removeListener('pty:data', handler)
+      dataSubscribers.delete(callback)
     }
   },
 
@@ -82,12 +90,9 @@ contextBridge.exposeInMainWorld('terminalAPI', {
   // Listen for terminal process exits.
   // Same pattern as onData - takes a callback, returns a cleanup function.
   onExit: (callback: (id: string, exitCode: number) => void) => {
-    const handler = (_event: IpcRendererEvent, { id, exitCode }: { id: string; exitCode: number }) => {
-      callback(id, exitCode)
-    }
-    ipcRenderer.on('pty:exit', handler)
+    exitSubscribers.add(callback)
     return () => {
-      ipcRenderer.removeListener('pty:exit', handler)
+      exitSubscribers.delete(callback)
     }
   },
 

@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { SplitView } from './SplitView'
+import { FloatingTerminal } from './FloatingTerminal'
 import type { Workspace } from '../types/terminal'
 import { AGENT_HUES, STATUS_COLORS } from '../types/terminal'
 import { useTerminalStore } from '../store/terminal-store'
@@ -36,6 +38,31 @@ export function ActiveStage({ workspace, visible }: ActiveStageProps) {
     promoteAgent(otherWorkspaces[0].id)
   }
 
+  // Accept workspace-card drops from the sidebar deck
+  const [workspaceDragOver, setWorkspaceDragOver] = useState(false)
+
+  function onStageDragOver(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes('application/x-vessel-workspace')) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setWorkspaceDragOver(true)
+  }
+
+  function onStageDragLeave(e: React.DragEvent) {
+    // Only clear when the cursor truly leaves this element (not just a child)
+    const next = e.relatedTarget as Node | null
+    if (next && e.currentTarget.contains(next)) return
+    setWorkspaceDragOver(false)
+  }
+
+  function onStageDrop(e: React.DragEvent) {
+    setWorkspaceDragOver(false)
+    const id = e.dataTransfer.getData('application/x-vessel-workspace')
+    if (!id || id === workspace.id) return
+    e.preventDefault()
+    promoteAgent(id)
+  }
+
   return (
     <div
       className={`active-stage ${statusClass} w-full h-full flex flex-col`}
@@ -44,6 +71,9 @@ export function ActiveStage({ workspace, visible }: ActiveStageProps) {
         '--status-color': statusColor,
         display: visible ? 'flex' : 'none',
       } as React.CSSProperties}
+      onDragOver={onStageDragOver}
+      onDragLeave={onStageDragLeave}
+      onDrop={onStageDrop}
     >
       {/* Header */}
       <div className="active-stage-header px-5 py-3.5">
@@ -106,11 +136,30 @@ export function ActiveStage({ workspace, visible }: ActiveStageProps) {
         </div>
       </div>
 
+      {/* Workspace-swap drop hint — shown when an agent card is dragged over */}
+      {workspaceDragOver && (
+        <div className="stage-workspace-drop-hint" aria-hidden="true">
+          <span className="stage-workspace-drop-label">Swap to stage</span>
+        </div>
+      )}
+
       {/* Terminal area */}
-      <div className="flex-1 min-h-0">
+      {/* position: relative so FloatingTerminals are positioned relative to this container */}
+      <div className="flex-1 min-h-0 relative">
         <div className="w-full h-full overflow-hidden" style={{ backgroundColor: 'var(--terminal-bg)' }}>
           <SplitView node={workspace.root} workspaceId={workspace.id} />
         </div>
+
+        {/* Floating terminal windows — layered above the split view */}
+        {workspace.floatedPanes.map((pane) => (
+          <FloatingTerminal
+            key={pane.terminalId}
+            terminalId={pane.terminalId}
+            workspaceId={workspace.id}
+            pane={pane}
+            workspaceName={workspace.name}
+          />
+        ))}
       </div>
     </div>
   )

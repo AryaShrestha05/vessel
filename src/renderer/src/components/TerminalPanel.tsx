@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useTerminal } from '../hooks/use-terminal'
 import { useTerminalStore } from '../store/terminal-store'
+import type { SplitNode } from '../types/terminal'
 
 interface TerminalPanelProps {
   terminalId: string
@@ -8,6 +9,11 @@ interface TerminalPanelProps {
 }
 
 type DockSide = 'left' | 'right' | 'top' | 'bottom'
+
+function countLeaves(node: SplitNode): number {
+  if (node.type === 'leaf') return 1
+  return countLeaves(node.children[0]) + countLeaves(node.children[1])
+}
 
 function getDockSide(e: React.DragEvent, el: HTMLElement): DockSide | null {
   const r = el.getBoundingClientRect()
@@ -30,6 +36,20 @@ export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
   const splitPane = useTerminalStore((s) => s.splitPane)
   const closePane = useTerminalStore((s) => s.closePane)
   const dockTerminal = useTerminalStore((s) => s.dockTerminal)
+  const floatPane = useTerminalStore((s) => s.floatPane)
+
+  // Float is only available when there is more than one terminal in the split tree
+  const canFloat = useTerminalStore((s) => {
+    const ws = s.workspaces.find((w) => w.id === workspaceId)
+    if (!ws) return false
+    return countLeaves(ws.root) > 1
+  })
+
+  // Splitting is blocked at the 4-pane limit
+  const canSplit = useTerminalStore((s) => {
+    const ws = s.workspaces.find((w) => w.id === workspaceId)
+    return ws ? ws.terminalIds.length < 4 : false
+  })
 
   return (
     <div
@@ -91,15 +111,16 @@ export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
         <button
           draggable
           onDragStart={(e) => {
+            e.stopPropagation()
             e.dataTransfer.effectAllowed = 'move'
             e.dataTransfer.setData(
               'application/x-vessel-terminal',
               JSON.stringify({ workspaceId, terminalId })
             )
+            e.dataTransfer.setData('text/plain', `${workspaceId}:${terminalId}`)
           }}
-          title="Drag to another workspace"
-          className="terminal-toolbar-btn"
-          style={{ cursor: 'grab' }}
+          title="Drag to move/split"
+          className="terminal-toolbar-btn terminal-toolbar-btn-drag"
         >
           <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor">
             <circle cx="3" cy="2.5" r="1" /><circle cx="7" cy="2.5" r="1" />
@@ -107,11 +128,27 @@ export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
             <circle cx="3" cy="9.5" r="1" /><circle cx="7" cy="9.5" r="1" />
           </svg>
         </button>
+        {/* Float: pop this pane out into a free-floating window */}
+        <button
+          onClick={(e) => { e.stopPropagation(); floatPane(workspaceId, terminalId) }}
+          disabled={!canFloat}
+          title={canFloat ? 'Float pane' : 'Cannot float — only one pane remains'}
+          className="terminal-toolbar-btn"
+          style={{ opacity: canFloat ? undefined : 0.3 }}
+        >
+          {/* Pop-out / float icon */}
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M4.5 2.5H2.5v7h7V7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M6.5 2.5h3v3M9.5 2.5L5.5 6.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
         <div className="terminal-toolbar-sep" />
         <button
           onClick={() => splitPane(workspaceId, terminalId, 'horizontal')}
-          title="Split right"
+          disabled={!canSplit}
+          title={canSplit ? 'Split right' : 'Max 4 panes reached'}
           className="terminal-toolbar-btn"
+          style={{ opacity: canSplit ? undefined : 0.3 }}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <rect x="0.5" y="0.5" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1" />
@@ -120,8 +157,10 @@ export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
         </button>
         <button
           onClick={() => splitPane(workspaceId, terminalId, 'vertical')}
-          title="Split down"
+          disabled={!canSplit}
+          title={canSplit ? 'Split down' : 'Max 4 panes reached'}
           className="terminal-toolbar-btn"
+          style={{ opacity: canSplit ? undefined : 0.3 }}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <rect x="0.5" y="0.5" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1" />
@@ -130,7 +169,10 @@ export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
         </button>
         <div className="terminal-toolbar-sep" />
         <button
-          onClick={() => closePane(workspaceId, terminalId)}
+          onClick={(e) => {
+            e.stopPropagation()
+            closePane(workspaceId, terminalId)
+          }}
           title="Close pane"
           className="terminal-toolbar-btn terminal-toolbar-btn-danger"
         >

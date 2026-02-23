@@ -63,6 +63,16 @@ export const STATUS_COLORS: Record<AgentStatus, string> = {
   error: '#f87171',    // red
 }
 
+// A pane that has been "floated" out of the split tree into a free-floating window.
+export interface FloatedPane {
+  terminalId: string
+  x: number       // left offset (px) from the terminal area
+  y: number       // top offset (px) from the terminal area
+  width: number
+  height: number
+  zIndex: number  // stacking order among floated panes
+}
+
 // A workspace is a named collection of terminals with a split layout.
 // In the "Focus & Periphery" model, each workspace is an "agent."
 export interface Workspace {
@@ -73,4 +83,5 @@ export interface Workspace {
   status: AgentStatus   // current agent status
   colorId: number       // index into AGENT_HUES for unique border hue
   pinned: boolean       // pinned agents stay at the top and never overflow
+  floatedPanes: FloatedPane[] // panes detached from the split tree into floating windows
 }

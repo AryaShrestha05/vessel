@@ -2,6 +2,8 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'path'
 import { PtyManager } from './pty-manager'
 
+const isDev = process.env['ELECTRON_RENDERER_URL'] !== undefined
+
 // --- NEW IMPORTS EXPLAINED ---
 // `ipcMain` is the main process side of Electron's IPC system.
 // It can:
@@ -17,19 +19,40 @@ const ptyManager = new PtyManager()
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    width: 1280,
+    height: 820,
+    // Prevent the window from being dragged to a useless size
+    minWidth: 700,
+    minHeight: 480,
+    // Hide until ready-to-show fires — eliminates the white flash on startup
+    show: false,
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+    // On Windows/Linux, replicate the traffic-light overlay look via a full-width titlebar
+    ...(process.platform !== 'darwin' && { titleBarOverlay: { color: '#12121a', symbolColor: '#a4a4bf', height: 44 } }),
+    backgroundColor: '#0a0a0f',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      // Disable the remote module entirely — not used and a common attack vector
+      webSecurity: true,
     }
   })
 
-  if (process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  // Show the window only once the renderer has fully painted —
+  // prevents the brief white-screen flash that Electron shows on cold start.
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show()
+  })
+
+  // Only allow DevTools in development — in production it leaks internals
+  if (isDev) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' })
+  }
+
+  if (isDev) {
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']!)
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }

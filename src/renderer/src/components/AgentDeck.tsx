@@ -5,6 +5,8 @@ import { CreateAgentMenu } from './CreateAgentMenu'
 import { useTerminalStore } from '../store/terminal-store'
 import { AGENT_HUES } from '../types/terminal'
 
+const TERMINAL_MIME = 'application/x-vessel-terminal'
+
 interface AgentDeckProps {
   agents: Workspace[]
 }
@@ -14,9 +16,12 @@ const VISIBLE_CARD_LIMIT = 6
 export function AgentDeck({ agents }: AgentDeckProps) {
   const [deckHovered, setDeckHovered] = useState(false)
   const createWorkspace = useTerminalStore((s) => s.createWorkspace)
+  const extractToNewWorkspace = useTerminalStore((s) => s.extractToNewWorkspace)
   const [newName, setNewName] = useState('')
   const [inputFocused, setInputFocused] = useState(false)
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null)
+  // Lit when a terminal pane is dragged over the sidebar
+  const [terminalDragOver, setTerminalDragOver] = useState(false)
 
   const handleCreate = () => {
     const name = newName.trim()
@@ -41,8 +46,37 @@ export function AgentDeck({ agents }: AgentDeckProps) {
   const visibleAgents = [...pinned, ...(hasOverflow ? unpinned.slice(0, unpinnedLimit) : unpinned)]
   const deckAgents = hasOverflow ? unpinned.slice(unpinnedLimit) : []
 
+  function onDeckDragOver(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes(TERMINAL_MIME)) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setTerminalDragOver(true)
+  }
+
+  function onDeckDragLeave(e: React.DragEvent) {
+    const next = e.relatedTarget as Node | null
+    if (next && e.currentTarget.contains(next)) return
+    setTerminalDragOver(false)
+  }
+
+  function onDeckDrop(e: React.DragEvent) {
+    setTerminalDragOver(false)
+    const raw = e.dataTransfer.getData(TERMINAL_MIME)
+    if (!raw) return
+    e.preventDefault()
+    try {
+      const { workspaceId, terminalId } = JSON.parse(raw) as { workspaceId: string; terminalId: string }
+      if (workspaceId && terminalId) extractToNewWorkspace(workspaceId, terminalId)
+    } catch { /* ignore malformed payload */ }
+  }
+
   return (
-    <div className="agent-deck h-full flex flex-col px-5">
+    <div
+      className={`agent-deck h-full flex flex-col px-5 ${terminalDragOver ? 'agent-deck--drop-active' : ''}`}
+      onDragOver={onDeckDragOver}
+      onDragLeave={onDeckDragLeave}
+      onDrop={onDeckDrop}
+    >
       {/* Title */}
       <div className="shrink-0 flex items-center justify-center pt-6 pb-5">
         <h2 className="agent-deck-title">
@@ -91,6 +125,15 @@ export function AgentDeck({ agents }: AgentDeckProps) {
           }}
         />
       )}
+
+      {/* Drop target hint — only shown while a terminal pane is being dragged */}
+      <div className={`agent-deck-drop-zone ${terminalDragOver ? 'agent-deck-drop-zone--active' : ''}`}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <rect x="0.75" y="0.75" width="12.5" height="12.5" rx="2.25" stroke="currentColor" strokeWidth="1.2" />
+          <path d="M7 4v6M4 7l3 3 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span>Drop to background</span>
+      </div>
 
       {/* Agent list */}
       <div className="flex-1 min-h-0 overflow-y-auto pb-5 space-y-4">

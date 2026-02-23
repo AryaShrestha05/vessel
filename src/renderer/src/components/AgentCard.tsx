@@ -1,3 +1,4 @@
+import React, { useState } from 'react'
 import type { Workspace } from '../types/terminal'
 import { AGENT_HUES, STATUS_COLORS } from '../types/terminal'
 import { useTerminalStore } from '../store/terminal-store'
@@ -22,13 +23,65 @@ export function AgentCard({ workspace, compact = false }: AgentCardProps) {
   const hue = AGENT_HUES[workspace.colorId]
   const statusColor = STATUS_COLORS[workspace.status]
   const statusClass = `status-border-${workspace.status}`
+  const [isDragging, setIsDragging] = useState(false)
+  // Holds the off-screen ghost element so we can clean it up after drag ends
+  const ghostRef = React.useRef<HTMLDivElement | null>(null)
+
   return (
     <div
+      draggable
+      onDragStart={(e) => {
+        setIsDragging(true)
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('application/x-vessel-workspace', workspace.id)
+
+        // The AgentCard contains a WebGL canvas (TerminalPreview). The browser's
+        // default drag ghost tries to screenshot the element, but WebGL canvases
+        // read back as blank from the CPU — causing a white flash.
+        // Fix: supply a lightweight canvas-free element as the drag image instead.
+        const ghost = document.createElement('div')
+        ghost.style.cssText = [
+          'position:fixed',
+          'top:-200px',         // off-screen — never visible as a real element
+          'padding:6px 12px',
+          'border-radius:8px',
+          `background:${hue}22`,
+          `border:1px solid ${hue}55`,
+          'color:#f0f0f5',
+          'font-size:12px',
+          'font-weight:600',
+          "font-family:'Geist',system-ui,sans-serif",
+          'white-space:nowrap',
+          'pointer-events:none',
+          'box-shadow:0 8px 24px rgba(0,0,0,0.5)',
+          'display:flex',
+          'align-items:center',
+          'gap:8px',
+        ].join(';')
+
+        // Coloured dot + name
+        const dot = document.createElement('span')
+        dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${hue};display:inline-block;flex-shrink:0`
+        ghost.appendChild(dot)
+        ghost.appendChild(document.createTextNode(workspace.name))
+
+        document.body.appendChild(ghost)
+        ghostRef.current = ghost
+        // Centre the ghost under the cursor horizontally, near top vertically
+        e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 20)
+      }}
+      onDragEnd={() => {
+        setIsDragging(false)
+        ghostRef.current?.remove()
+        ghostRef.current = null
+      }}
       onClick={() => promoteAgent(workspace.id)}
-      className={`agent-card ${statusClass} cursor-pointer`}
+      className={`agent-card ${statusClass} cursor-grab active:cursor-grabbing`}
       style={{
         '--agent-hue': hue,
         '--status-color': statusColor,
+        opacity: isDragging ? 0.45 : undefined,
+        transition: isDragging ? 'opacity 120ms' : undefined,
       } as React.CSSProperties}
     >
       {/* Live terminal preview */}

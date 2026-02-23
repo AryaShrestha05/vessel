@@ -1,0 +1,145 @@
+# .github/workflows/release.yml
+#
+# Triggered whenever you push a version tag (e.g. v1.0.0).
+# Builds Vessel on all three platforms in parallel and uploads the
+# distributables as assets on a GitHub Release.
+#
+# How to trigger a release:
+#   git tag v1.2.3
+#   git push origin v1.2.3
+#
+# The workflow will:
+#   1. Create (or update) a GitHub Release for that tag
+#   2. Build on macOS, Windows, and Linux in parallel
+#   3. Upload .dmg + .zip (macOS), .exe (Windows), .AppImage + .deb (Linux)
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+# Allow the job to create a release and upload assets
+permissions:
+  contents: write
+
+jobs:
+  # ── macOS ───────────────────────────────────────────────────────────────────
+  build-mac:
+    name: Build (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # node-pty is a native addon — rebuild for the Electron version in use
+      - name: Rebuild native modules
+        run: npm run postinstall
+
+      # Generate icon files from SVG (iconutil is macOS built-in)
+      - name: Generate icons
+        run: npm run icons
+
+      - name: Build & package (macOS)
+        run: npm run dist:mac
+        env:
+          # electron-builder reads this to skip code-signing in CI
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload macOS artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.dmg
+            dist/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Windows ─────────────────────────────────────────────────────────────────
+  build-win:
+    name: Build (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild native modules
+        run: npm run postinstall
+
+      # Icons were already committed to the repo (generated locally);
+      # re-run on Windows to ensure .ico is present.
+      - name: Generate icons (Windows — skip .icns step)
+        # The build-icons script calls iconutil which is macOS-only.
+        # We pre-commit the generated files so this step is a no-op on Windows
+        # (the SVG + PNG + ICO are already in the repo).
+        run: node -e "console.log('Icons already present in repo, skipping iconutil step on Windows.')"
+
+      - name: Build & package (Windows)
+        run: npm run dist:win
+
+      - name: Upload Windows artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Linux ────────────────────────────────────────────────────────────────────
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # electron-builder needs some system libs on Ubuntu
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libnotify-dev \
+            libnss3 \
+            libxss1 \
+            libxtst6 \
+            xvfb \
+            rpm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild native modules
+        run: npm run postinstall
+
+      - name: Build & package (Linux)
+        run: npm run dist:linux
+        # xvfb-run is needed by some Electron builds on headless Linux runners
+        # Wrap if you hit display errors: xvfb-run --auto-servernum npm run dist:linux
+
+      - name: Upload Linux artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.AppImage
+            dist/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

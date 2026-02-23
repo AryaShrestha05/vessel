@@ -504,6 +504,64 @@ body {
   transform: scale(1.03);
 }
 
+.titlebar-menu-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  cursor: pointer;
+  position: relative;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--text-primary);
+  backdrop-filter: blur(12px) saturate(1.6) brightness(1.15);
+  -webkit-backdrop-filter: blur(12px) saturate(1.6) brightness(1.15);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
+  transition: transform var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
+}
+
+.titlebar-menu-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.titlebar-menu-btn:active {
+  transform: translateY(0);
+}
+
+[data-theme="light"] .titlebar-menu-btn {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 14px 40px rgba(31, 38, 135, 0.16);
+}
+
+.titlebar-menu-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] .titlebar-menu-badge {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
 /* ============================================
    Empty State
    ============================================ */
@@ -1147,6 +1205,14 @@ body {
   transition: all 0.15s;
 }
 
+.terminal-toolbar-btn-drag {
+  cursor: grab;
+}
+
+.terminal-toolbar-btn-drag:active {
+  cursor: grabbing;
+}
+
 .terminal-toolbar-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
@@ -1322,6 +1388,233 @@ body {
       rgba(248, 113, 113, 0.02) 6px,
       rgba(248, 113, 113, 0.02) 12px);
 }
+
+/* ============================================
+   Agent Deck — terminal pane drop zone
+   ============================================ */
+
+/* Always-present drop zone strip; invisible until a drag is in progress */
+.agent-deck-drop-zone {
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 8px;
+  border: 1px dashed transparent;
+  color: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  /* Collapsed height when inactive — zero visual cost */
+  height: 0;
+  margin-bottom: 0;
+  padding: 0 10px;
+  transition:
+    height 200ms var(--ease-out),
+    margin-bottom 200ms var(--ease-out),
+    padding 200ms var(--ease-out),
+    border-color 200ms var(--ease-out),
+    color 200ms var(--ease-out),
+    background 200ms var(--ease-out);
+  pointer-events: none;
+}
+
+/* Expanded + lit when a terminal is being dragged */
+.agent-deck-drop-zone--active {
+  height: 40px;
+  margin-bottom: 12px;
+  padding: 0 10px;
+  border-color: color-mix(in oklab, var(--accent) 50%, transparent);
+  color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+  pointer-events: auto;
+  animation: dockHintIn 180ms var(--ease-out) both;
+}
+
+/* Brighter glow on the whole sidebar when something can be dropped into it */
+.agent-deck--drop-active {
+  outline: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+  outline-offset: -1px;
+}
+
+/* ============================================
+   Workspace-card drop hint (drag from sidebar → active stage)
+   ============================================ */
+
+.stage-workspace-drop-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklab, var(--accent) 7%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 18%, transparent);
+  animation: dockHintIn 160ms var(--ease-out) both;
+}
+
+.stage-workspace-drop-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  text-shadow: 0 0 16px color-mix(in oklab, var(--accent) 60%, transparent);
+  text-transform: uppercase;
+  background: color-mix(in oklab, var(--bg-secondary) 80%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+  padding: 6px 14px;
+  border-radius: 999px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ============================================
+   Floating Terminal Window
+   ============================================ */
+
+.floating-terminal {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  /* Deep shadow to lift it above the split panes */
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    0 24px 80px rgba(0, 0, 0, 0.4);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  /* Entrance animation */
+  animation: floatIn 220ms var(--ease-out) both;
+  will-change: transform;
+}
+
+@keyframes floatIn {
+  from {
+    opacity: 0;
+    transform: scale(0.93) translateY(10px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* Light theme tweaks */
+[data-theme="light"] .floating-terminal {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 24px 80px rgba(0, 0, 0, 0.1);
+  border-color: var(--border-primary);
+}
+
+/* Title bar — the drag handle */
+.floating-terminal__titlebar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-primary);
+  cursor: grab;
+  /* Prevent text selection while dragging */
+  user-select: none;
+  -webkit-user-select: none;
+  /* No drag region — these are real interactive elements */
+  -webkit-app-region: no-drag;
+}
+
+.floating-terminal__titlebar:active {
+  cursor: grabbing;
+}
+
+/* Buttons inside the title bar must not show the grab cursor */
+.floating-terminal__titlebar button {
+  cursor: default;
+}
+
+/* Centered window label */
+.floating-terminal__title {
+  flex: 1;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-tertiary);
+  text-shadow: var(--text-glow-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none; /* title can't accidentally start drag */
+}
+
+/* Dock-back button on the right side of the title bar */
+.ft-dock-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.floating-terminal__titlebar:hover .ft-dock-btn {
+  opacity: 1;
+}
+
+.ft-dock-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .ft-dock-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* Terminal canvas area */
+.floating-terminal__content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--terminal-bg);
+}
+
+/* ── Resize handles ─────────────────────────────────────────────────────── */
+/* Each handle is an invisible hot-spot at the window edge/corner */
+
+.ft-resize {
+  position: absolute;
+  z-index: 20; /* above terminal content */
+}
+
+/* Edge handles — thin strips */
+.ft-resize--n  { top: -4px;    left: 12px;   right: 12px;  height: 8px;  cursor: n-resize; }
+.ft-resize--s  { bottom: -4px; left: 12px;   right: 12px;  height: 8px;  cursor: s-resize; }
+.ft-resize--e  { top: 12px;    bottom: 12px; right: -4px;  width: 8px;   cursor: e-resize; }
+.ft-resize--w  { top: 12px;    bottom: 12px; left: -4px;   width: 8px;   cursor: w-resize; }
+
+/* Corner handles — larger hit targets */
+.ft-resize--ne { top: -4px;    right: -4px;  width: 16px;  height: 16px; cursor: ne-resize; }
+.ft-resize--se { bottom: -4px; right: -4px;  width: 16px;  height: 16px; cursor: se-resize; }
+.ft-resize--sw { bottom: -4px; left: -4px;   width: 16px;  height: 16px; cursor: sw-resize; }
+.ft-resize--nw { top: -4px;    left: -4px;   width: 16px;  height: 16px; cursor: nw-resize; }
 
 /* ============================================
    Agent Deck - Card Stacking / Fanning
