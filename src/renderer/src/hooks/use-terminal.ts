@@ -3,43 +3,17 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { WebLinksAddon } from '@xterm/addon-web-links'
-import { setTerminalPreview, deleteTerminalPreview } from './use-terminal-preview'
+import { deleteTerminalBuffer } from './use-terminal-buffer'
+import { ingestTerminalOutput } from './use-terminal-meta'
 
 // Track which PTY sessions have been created so we don't re-create on remount
 const activePtys = new Set<string>()
 
-function captureTerminalCanvas(container: HTMLElement, terminalId: string): void {
-  // xterm.js renders into canvas elements inside .xterm-screen
-  const canvases = container.querySelectorAll<HTMLCanvasElement>('.xterm-screen canvas')
-  if (canvases.length === 0) return
+// Map terminalId → cwd for terminals that should start in a specific directory
+const terminalCwds = new Map<string, string>()
 
-  // Find the largest canvas (the main text layer)
-  let mainCanvas: HTMLCanvasElement | null = null
-  let maxArea = 0
-  canvases.forEach((c) => {
-    const area = c.width * c.height
-    if (area > maxArea) {
-      maxArea = area
-      mainCanvas = c
-    }
-  })
-
-  if (!mainCanvas || maxArea === 0) return
-
-  try {
-    // Draw to a small thumbnail canvas for efficiency
-    const thumb = document.createElement('canvas')
-    const scale = 0.5
-    thumb.width = (mainCanvas as HTMLCanvasElement).width * scale
-    thumb.height = (mainCanvas as HTMLCanvasElement).height * scale
-    const ctx = thumb.getContext('2d')
-    if (!ctx) return
-    ctx.drawImage(mainCanvas, 0, 0, thumb.width, thumb.height)
-    const dataUrl = thumb.toDataURL('image/png', 0.6)
-    setTerminalPreview(terminalId, dataUrl)
-  } catch {
-    // Canvas may be tainted or empty, ignore
-  }
+export function setTerminalCwd(terminalId: string, cwd: string): void {
+  terminalCwds.set(terminalId, cwd)
 }
 
 export function useTerminal(
@@ -94,6 +68,10 @@ export function useTerminal(
     // WebLinks turns URLs in the terminal output into clickable links
     term.loadAddon(new WebLinksAddon())
     term.open(container)
+    term.focus()
+
+    const focus = () => term.focus()
+    container.addEventListener('mousedown', focus, { capture: true })
 
     // WebGL renderer draws the terminal on a GPU-accelerated canvas instead
     // of the default DOM canvas, which is significantly faster for large outputs
@@ -116,11 +94,16 @@ export function useTerminal(
     // Only create the PTY if it hasn't been created yet
     if (!activePtys.has(terminalId)) {
       activePtys.add(terminalId)
-      window.terminalAPI.create(terminalId, term.cols, term.rows)
+      const cwd = terminalCwds.get(terminalId)
+      terminalCwds.delete(terminalId) // consumed, no longer needed
+      window.terminalAPI.create(terminalId, term.cols, term.rows, cwd)
     }
 
     const unsubData = window.terminalAPI.onData((id, data) => {
-      if (id === terminalId) term.write(data)
+      if (id === terminalId) {
+        ingestTerminalOutput(terminalId, data)
+        term.write(data)
+      }
     })
 
     const unsubExit = window.terminalAPI.onExit((id, exitCode) => {
@@ -142,26 +125,12 @@ export function useTerminal(
     })
     resizeObserver.observe(container)
 
-    // Capture terminal preview snapshots periodically
-    // Initial capture after a short delay to let content render
-    const initialCapture = setTimeout(() => {
-      captureTerminalCanvas(container, terminalId)
-    }, 500)
-
-    const captureInterval = setInterval(() => {
-      // Only capture if the container is actually visible (not display:none)
-      if (container.offsetParent !== null) {
-        captureTerminalCanvas(container, terminalId)
-      }
-    }, 1500)
-
     return () => {
-      clearTimeout(initialCapture)
-      clearInterval(captureInterval)
       resizeObserver.disconnect()
       unsubData()
       unsubExit()
       onDataDisposable.dispose()
+      container.removeEventListener('mousedown', focus, { capture: true } as AddEventListenerOptions)
       // Do NOT destroy the PTY here — the process should survive tab switches.
       // PTY destruction is handled by the store's deleteWorkspace/closePane actions.
       term.dispose()
@@ -174,5 +143,5 @@ export function useTerminal(
 // Called externally to clean up tracking when a PTY is destroyed by the store
 export function cleanupPtyTracking(terminalId: string): void {
   activePtys.delete(terminalId)
-  deleteTerminalPreview(terminalId)
+  deleteTerminalBuffer(terminalId)
 }

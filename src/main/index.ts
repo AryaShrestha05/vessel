@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'path'
 import { PtyManager } from './pty-manager'
 
@@ -74,6 +74,18 @@ ipcMain.on('pty:resize', (_event, { id, cols, rows }) => {
 // Happens when the user closes a terminal pane or tab.
 ipcMain.on('pty:destroy', (_event, { id }) => {
   ptyManager.destroy(id)
+})
+
+// 'dialog:openDirectory' - Renderer asks to pick a folder via the native OS dialog.
+// We pass the sender's BrowserWindow as parent so the sheet appears attached to the app window on macOS.
+ipcMain.handle('dialog:openDirectory', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  const result = await dialog.showOpenDialog(win!, {
+    properties: ['openDirectory'],
+    title: 'Select working directory',
+  })
+  if (result.canceled || result.filePaths.length === 0) return null
+  return result.filePaths[0]
 })
 
 app.whenReady().then(() => {

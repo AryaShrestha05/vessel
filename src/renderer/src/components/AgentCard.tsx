@@ -1,7 +1,7 @@
 import type { Workspace } from '../types/terminal'
 import { AGENT_HUES, STATUS_COLORS } from '../types/terminal'
 import { useTerminalStore } from '../store/terminal-store'
-import { useTerminalPreview } from '../hooks/use-terminal-preview'
+import { TerminalPreview } from './TerminalPreview'
 
 interface AgentCardProps {
   workspace: Workspace
@@ -18,49 +18,23 @@ const STATUS_LABELS: Record<Workspace['status'], string> = {
 export function AgentCard({ workspace, compact = false }: AgentCardProps) {
   const promoteAgent = useTerminalStore((s) => s.promoteAgent)
   const deleteWorkspace = useTerminalStore((s) => s.deleteWorkspace)
+  const togglePin = useTerminalStore((s) => s.togglePin)
   const hue = AGENT_HUES[workspace.colorId]
   const statusColor = STATUS_COLORS[workspace.status]
   const statusClass = `status-border-${workspace.status}`
-  const preview = useTerminalPreview(workspace.terminalIds[0])
-
   return (
     <div
       onClick={() => promoteAgent(workspace.id)}
-      draggable={workspace.terminalIds.length > 0}
-      onDragStart={(e) => {
-        e.stopPropagation()
-        const terminalId = workspace.terminalIds[0]
-        e.dataTransfer.effectAllowed = 'move'
-        e.dataTransfer.setData(
-          'application/x-vessel-terminal',
-          JSON.stringify({ workspaceId: workspace.id, terminalId })
-        )
-        e.dataTransfer.setData('text/plain', `${workspace.id}:${terminalId}`)
-      }}
-      className={`agent-card ${statusClass} cursor-grab active:cursor-grabbing`}
+      className={`agent-card ${statusClass} cursor-pointer`}
       style={{
         '--agent-hue': hue,
         '--status-color': statusColor,
       } as React.CSSProperties}
     >
-      {/* Terminal thumbnail preview - hero area */}
+      {/* Live terminal preview */}
       {!compact && (
         <div className="agent-card-preview">
-          {preview ? (
-            <img
-              src={preview}
-              alt={`${workspace.name} terminal`}
-              className="agent-card-preview-img"
-              draggable={false}
-            />
-          ) : (
-            <div className="agent-card-preview-placeholder">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="4 17 10 11 4 5" />
-                <line x1="12" y1="19" x2="20" y2="19" />
-              </svg>
-            </div>
-          )}
+          <TerminalPreview terminalId={workspace.terminalIds[0]} />
         </div>
       )}
 
@@ -78,17 +52,32 @@ export function AgentCard({ workspace, compact = false }: AgentCardProps) {
             </span>
           </div>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              deleteWorkspace(workspace.id)
-            }}
-            className="agent-card-close"
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                togglePin(workspace.id)
+              }}
+              className={`agent-card-pin ${workspace.pinned ? 'agent-card-pin--active' : ''}`}
+              title={workspace.pinned ? 'Unpin agent' : 'Pin agent'}
+            >
+              <svg width="11" height="11" viewBox="0 0 16 16" fill={workspace.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9.828 1.172a1 1 0 0 1 1.414 0l3.586 3.586a1 1 0 0 1 0 1.414l-3.12 3.12a1 1 0 0 1-.708.293H8.5l-1.793 1.793a1 1 0 0 1-.707.293H5l-1 1v1.5H2.5V12.5H4v-1l1-1v-1a1 1 0 0 1 .293-.707L7.086 7v-2.5a1 1 0 0 1 .293-.708l3.12-3.12Z" />
+              </svg>
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                deleteWorkspace(workspace.id)
+              }}
+              className="agent-card-close"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Status row */}

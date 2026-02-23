@@ -813,6 +813,151 @@ body {
 }
 
 /* ============================================
+   Create Agent Menu (right-click popover)
+   ============================================ */
+
+.create-agent-menu {
+  position: fixed;
+  z-index: 1000;
+  width: 280px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(22, 22, 30, 0.92);
+  border: 1px solid var(--border-secondary);
+  backdrop-filter: blur(40px) saturate(1.4);
+  -webkit-backdrop-filter: blur(40px) saturate(1.4);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: menu-enter 0.15s var(--ease-out);
+}
+
+@keyframes menu-enter {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.create-agent-menu-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-shadow: var(--text-glow-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.create-agent-menu-input {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-primary);
+  outline: none;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-primary);
+  transition: border-color 0.15s;
+}
+
+.create-agent-menu-input:focus {
+  border-color: var(--border-secondary);
+}
+
+.create-agent-menu-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.create-agent-menu-colors {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.create-agent-menu-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+  padding: 0;
+}
+
+.create-agent-menu-swatch:hover {
+  transform: scale(1.15);
+}
+
+.create-agent-menu-swatch--selected {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 8px currentColor;
+  transform: scale(1.1);
+}
+
+.create-agent-menu-cwd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+}
+
+.create-agent-menu-cwd-path {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.create-agent-menu-browse-btn {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.create-agent-menu-browse-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-secondary);
+  color: var(--text-primary);
+}
+
+.create-agent-menu-create-btn {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  margin-top: 2px;
+}
+
+.create-agent-menu-create-btn:hover {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: var(--border-secondary);
+}
+
+.create-agent-menu-create-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ============================================
    Agent Card
    ============================================ */
 
@@ -877,6 +1022,43 @@ body {
   background: rgba(248, 113, 113, 0.12);
 }
 
+/* Pin button */
+.agent-card-pin {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  text-shadow: var(--text-glow-tertiary);
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.group:hover .agent-card-pin,
+.agent-card:hover .agent-card-pin {
+  opacity: 1;
+}
+
+.agent-card-pin--active {
+  opacity: 1 !important;
+  color: var(--text-primary);
+}
+
+.agent-card-pin:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Pinned card accent */
+.agent-card--pinned {
+  border-color: var(--border-secondary);
+}
+
 .agent-card-status-dot {
   width: 5px;
   height: 5px;
@@ -907,31 +1089,26 @@ body {
   border-radius: 11px 11px 0 0;
 }
 
-.agent-card-preview-placeholder {
+.terminal-preview-live {
   width: 100%;
-  height: 100px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-tertiary);
-  text-shadow: var(--text-glow-tertiary);
-  opacity: 0.25;
-}
-
-.agent-card-preview-img {
-  display: block;
-  width: 100%;
-  height: auto;
-  min-height: 100px;
-  max-height: 140px;
-  object-fit: cover;
-  object-position: top left;
+  height: 120px;
+  pointer-events: none;
   opacity: 0.8;
   transition: opacity 0.2s ease;
+  overflow: hidden;
 }
 
-.agent-card:hover .agent-card-preview-img {
+.agent-card:hover .terminal-preview-live {
   opacity: 1;
+}
+
+/* Hide scrollbar and cursor layer in mini preview */
+.terminal-preview-live .xterm-viewport {
+  overflow: hidden !important;
+}
+
+.terminal-preview-live .xterm-viewport::-webkit-scrollbar {
+  display: none;
 }
 
 /* ============================================

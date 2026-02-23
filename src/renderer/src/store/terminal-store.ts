@@ -2,7 +2,12 @@ import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import type { Workspace, SplitNode, AgentStatus } from '../types/terminal'
 import { AGENT_HUES } from '../types/terminal'
-import { cleanupPtyTracking } from '../hooks/use-terminal'
+import { cleanupPtyTracking, setTerminalCwd } from '../hooks/use-terminal'
+
+export interface CreateWorkspaceOptions {
+  colorId?: number
+  cwd?: string
+}
 
 type DockSide = 'left' | 'right' | 'top' | 'bottom'
 
@@ -11,10 +16,11 @@ interface TerminalStore {
   // The agent currently displayed on the Active Stage
   activeAgentId: string | null
 
-  createWorkspace: (name: string) => void
+  createWorkspace: (name: string, options?: CreateWorkspaceOptions) => void
   deleteWorkspace: (id: string) => void
   promoteAgent: (id: string) => void
   setAgentStatus: (id: string, status: AgentStatus) => void
+  togglePin: (id: string) => void
   splitPane: (workspaceId: string, terminalId: string, direction: 'horizontal' | 'vertical') => void
   closePane: (workspaceId: string, terminalId: string) => void
   dockTerminal: (
@@ -71,10 +77,13 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
   workspaces: [],
   activeAgentId: null,
 
-  createWorkspace: (name: string) => {
+  createWorkspace: (name: string, options?: CreateWorkspaceOptions) => {
     const workspaceId = uuidv4()
     const terminalId = uuidv4()
-    const colorId = nextColorIndex++ % AGENT_HUES.length
+    const colorId = options?.colorId ?? nextColorIndex++ % AGENT_HUES.length
+    if (options?.cwd) {
+      setTerminalCwd(terminalId, options.cwd)
+    }
     const newWorkspace: Workspace = {
       id: workspaceId,
       name,
@@ -82,6 +91,7 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
       terminalIds: [terminalId],
       status: 'idle',
       colorId,
+      pinned: false,
     }
     set((state) => {
       const isFirst = state.workspaces.length === 0 && state.activeAgentId === null
@@ -123,6 +133,14 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
     set((state) => ({
       workspaces: state.workspaces.map((w) =>
         w.id === id ? { ...w, status } : w
+      ),
+    }))
+  },
+
+  togglePin: (id: string) => {
+    set((state) => ({
+      workspaces: state.workspaces.map((w) =>
+        w.id === id ? { ...w, pinned: !w.pinned } : w
       ),
     }))
   },
