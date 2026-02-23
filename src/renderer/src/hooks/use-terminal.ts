@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebglAddon } from '@xterm/addon-webgl'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import { setTerminalPreview, deleteTerminalPreview } from './use-terminal-preview'
 
 // Track which PTY sessions have been created so we don't re-create on remount
@@ -57,6 +59,10 @@ export function useTerminal(
       fontSize: 13,
       lineHeight: 1.35,
       fontFamily: "'Geist Mono', 'SF Mono', Menlo, monospace",
+      // Keep 10k lines of scrollback so users can scroll up through long output
+      scrollback: 10000,
+      // Required for WebGL renderer to draw on a transparent background
+      allowTransparency: true,
       theme: {
         background: '#0a0a0f',
         foreground: '#e0e0e8',
@@ -85,7 +91,20 @@ export function useTerminal(
 
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
+    // WebLinks turns URLs in the terminal output into clickable links
+    term.loadAddon(new WebLinksAddon())
     term.open(container)
+
+    // WebGL renderer draws the terminal on a GPU-accelerated canvas instead
+    // of the default DOM canvas, which is significantly faster for large outputs
+    try {
+      const webglAddon = new WebglAddon()
+      // If the GPU context is lost (e.g. too many canvases), fall back gracefully
+      webglAddon.onContextLoss(() => webglAddon.dispose())
+      term.loadAddon(webglAddon)
+    } catch {
+      // WebGL unavailable — xterm falls back to its canvas renderer automatically
+    }
 
     requestAnimationFrame(() => {
       fitAddon.fit()

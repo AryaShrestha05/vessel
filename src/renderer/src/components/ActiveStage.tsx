@@ -1,6 +1,8 @@
 import { SplitView } from './SplitView'
 import type { Workspace } from '../types/terminal'
 import { AGENT_HUES, STATUS_COLORS } from '../types/terminal'
+import { useTerminalStore } from '../store/terminal-store'
+import { useUIStore } from '../store/ui-store'
 
 interface ActiveStageProps {
   workspace: Workspace
@@ -18,6 +20,21 @@ export function ActiveStage({ workspace, visible }: ActiveStageProps) {
   const hue = AGENT_HUES[workspace.colorId]
   const statusColor = STATUS_COLORS[workspace.status]
   const statusClass = `status-border-${workspace.status}`
+  const deleteWorkspace = useTerminalStore((s) => s.deleteWorkspace)
+  const promoteAgent = useTerminalStore((s) => s.promoteAgent)
+  const workspaces = useTerminalStore((s) => s.workspaces)
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar)
+
+  // "Minimize" — send this workspace to the sidebar by promoting another agent.
+  // If there's only one workspace, we can't minimize it (nowhere to go).
+  const otherWorkspaces = workspaces.filter((w) => w.id !== workspace.id)
+  const canMinimize = otherWorkspaces.length > 0
+
+  function handleMinimize() {
+    if (!canMinimize) return
+    // Promote the next workspace so this one goes to the background deck
+    promoteAgent(otherWorkspaces[0].id)
+  }
 
   return (
     <div
@@ -30,7 +47,42 @@ export function ActiveStage({ workspace, visible }: ActiveStageProps) {
     >
       {/* Header */}
       <div className="active-stage-header px-5 py-3.5">
+        {/* Left: traffic lights + agent name + status */}
         <div className="flex items-center gap-3">
+          {/* macOS-style traffic light buttons */}
+          <div className="traffic-lights">
+            {/* Red — close/delete this workspace */}
+            <button
+              type="button"
+              className="traffic-light traffic-light--red"
+              onClick={() => deleteWorkspace(workspace.id)}
+              title="Close workspace"
+            >
+              <span className="tl-icon">✕</span>
+            </button>
+
+            {/* Yellow — minimize to sidebar (promote another agent) */}
+            <button
+              type="button"
+              className="traffic-light traffic-light--yellow"
+              onClick={handleMinimize}
+              disabled={!canMinimize}
+              title={canMinimize ? 'Minimize to sidebar' : 'No other workspaces'}
+            >
+              <span className="tl-icon">−</span>
+            </button>
+
+            {/* Green — toggle the agent deck sidebar */}
+            <button
+              type="button"
+              className="traffic-light traffic-light--green"
+              onClick={toggleSidebar}
+              title="Toggle sidebar"
+            >
+              <span className="tl-icon">+</span>
+            </button>
+          </div>
+
           <div className="active-stage-dot" style={{ backgroundColor: hue }} />
           <span className="active-stage-name">
             {workspace.name}

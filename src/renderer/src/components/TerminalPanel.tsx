@@ -87,6 +87,27 @@ export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
           pointerEvents: hovered ? 'auto' : 'none',
         }}
       >
+        {/* Drag handle — sets the dataTransfer payload so drop targets can receive it */}
+        <button
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = 'move'
+            e.dataTransfer.setData(
+              'application/x-vessel-terminal',
+              JSON.stringify({ workspaceId, terminalId })
+            )
+          }}
+          title="Drag to another workspace"
+          className="terminal-toolbar-btn"
+          style={{ cursor: 'grab' }}
+        >
+          <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor">
+            <circle cx="3" cy="2.5" r="1" /><circle cx="7" cy="2.5" r="1" />
+            <circle cx="3" cy="6"   r="1" /><circle cx="7" cy="6"   r="1" />
+            <circle cx="3" cy="9.5" r="1" /><circle cx="7" cy="9.5" r="1" />
+          </svg>
+        </button>
+        <div className="terminal-toolbar-sep" />
         <button
           onClick={() => splitPane(workspaceId, terminalId, 'horizontal')}
           title="Split right"

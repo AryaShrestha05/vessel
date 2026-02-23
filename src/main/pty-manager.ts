@@ -70,8 +70,15 @@ export class PtyManager {
       cwd: cwd || process.env.HOME || '/',
 
       // Pass through the current environment variables (PATH, HOME, etc.)
-      // The shell needs these to find executables, know the user, etc.
-      env: process.env as Record<string, string>
+      // and add a few extras that tell programs they're inside Vessel:
+      //   COLORTERM=truecolor  → enables 24-bit RGB color in tools like vim, bat, delta
+      //   TERM_PROGRAM         → identifies the terminal app (like iTerm2 does)
+      env: {
+        ...process.env,
+        COLORTERM: 'truecolor',
+        TERM_PROGRAM: 'Vessel',
+        TERM_PROGRAM_VERSION: '1.0.0',
+      } as Record<string, string>
     })
 
     // Store the session so we can look it up later for write/resize/destroy

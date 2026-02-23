@@ -152,25 +152,27 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
   closePane: (workspaceId: string, terminalId: string) => {
     window.terminalAPI.destroy(terminalId)
     cleanupPtyTracking(terminalId)
-    set((state) => ({
-      workspaces: state.workspaces.map((w) => {
-        if (w.id !== workspaceId) return w
-        const newRoot = removeFromTree(w.root, terminalId)
-        if (!newRoot) {
-          const freshTerminalId = uuidv4()
-          return {
-            ...w,
-            root: { type: 'leaf' as const, terminalId: freshTerminalId },
-            terminalIds: [freshTerminalId]
-          }
-        }
-        return {
-          ...w,
-          root: newRoot,
-          terminalIds: w.terminalIds.filter((id) => id !== terminalId)
-        }
-      })
-    }))
+    set((state) => {
+      const workspace = state.workspaces.find((w) => w.id === workspaceId)
+      if (!workspace) return state
+      const newRoot = removeFromTree(workspace.root, terminalId)
+
+      // Last pane closed — delete the whole workspace instead of spawning a new terminal
+      if (!newRoot) {
+        const remaining = state.workspaces.filter((w) => w.id !== workspaceId)
+        const newActiveId = state.activeAgentId === workspaceId
+          ? (remaining.length > 0 ? remaining[0].id : null)
+          : state.activeAgentId
+        return { workspaces: remaining, activeAgentId: newActiveId }
+      }
+
+      return {
+        workspaces: state.workspaces.map((w) => {
+          if (w.id !== workspaceId) return w
+          return { ...w, root: newRoot, terminalIds: w.terminalIds.filter((id) => id !== terminalId) }
+        }),
+      }
+    })
   },
 
   dockTerminal: (sourceWorkspaceId, sourceTerminalId, targetWorkspaceId, targetTerminalId, side) => {
@@ -184,40 +186,39 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
       if (!sourceWs.terminalIds.includes(sourceTerminalId)) return state
       if (targetWs.terminalIds.includes(sourceTerminalId)) return state
 
-      const updated = state.workspaces.map((w) => {
-        if (w.id === sourceWorkspaceId) {
-          const prunedRoot = removeFromTree(w.root, sourceTerminalId)
-          if (!prunedRoot) {
-            const freshTerminalId = uuidv4()
+      const prunedSourceRoot = removeFromTree(sourceWs.root, sourceTerminalId)
+      // If the source workspace becomes empty, we'll delete it entirely
+      const sourceBecomesEmpty = !prunedSourceRoot
+
+      const newTargetRoot = mapTree(targetWs.root, targetTerminalId, () =>
+        splitWithIncoming(targetTerminalId, sourceTerminalId, side)
+      )
+      // If targetTerminalId wasn't found in the tree, nothing to do
+      if (newTargetRoot === targetWs.root) return state
+
+      const updated = state.workspaces
+        .filter((w) => !(w.id === sourceWorkspaceId && sourceBecomesEmpty))
+        .map((w) => {
+          if (w.id === sourceWorkspaceId) {
             return {
               ...w,
-              root: { type: 'leaf' as const, terminalId: freshTerminalId },
-              terminalIds: [freshTerminalId],
+              root: prunedSourceRoot!,
+              terminalIds: w.terminalIds.filter((id) => id !== sourceTerminalId),
             }
           }
-          return {
-            ...w,
-            root: prunedRoot,
-            terminalIds: w.terminalIds.filter((id) => id !== sourceTerminalId),
+          if (w.id === targetWorkspaceId) {
+            return { ...w, root: newTargetRoot, terminalIds: [...w.terminalIds, sourceTerminalId] }
           }
-        }
+          return w
+        })
 
-        if (w.id === targetWorkspaceId) {
-          const newRoot = mapTree(w.root, targetTerminalId, () =>
-            splitWithIncoming(targetTerminalId, sourceTerminalId, side)
-          )
-          // If targetTerminalId wasn't found, mapTree will return the original tree unchanged.
-          // In that case, don't mutate terminalIds.
-          const changed = newRoot !== w.root
-          return changed
-            ? { ...w, root: newRoot, terminalIds: [...w.terminalIds, sourceTerminalId] }
-            : w
-        }
+      // If the active workspace was the one we just deleted, promote another
+      let newActiveId = state.activeAgentId
+      if (sourceBecomesEmpty && state.activeAgentId === sourceWorkspaceId) {
+        newActiveId = updated.length > 0 ? updated[0].id : null
+      }
 
-        return w
-      })
-
-      return { ...state, workspaces: updated }
+      return { ...state, workspaces: updated, activeAgentId: newActiveId }
     })
   },
 }))
