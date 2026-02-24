@@ -37,6 +37,11 @@ jobs:
           node-version: 20
           cache: npm
 
+      # Python 3.12+ dropped distutils; node-gyp (used by node-pty) needs it.
+      # setuptools restores distutils on the runner.
+      - name: Install Python setuptools (for node-pty build)
+        run: pip3 install setuptools --break-system-packages
+
       - name: Install dependencies
         run: npm ci
 
@@ -74,6 +79,9 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
+      - name: Install Python setuptools (for node-pty build)
+        run: pip install setuptools
 
       - name: Install dependencies
         run: npm ci
@@ -122,7 +130,8 @@ jobs:
             libxss1 \
             libxtst6 \
             xvfb \
-            rpm
+            rpm \
+            python3-setuptools
 
       - name: Install dependencies
         run: npm ci
