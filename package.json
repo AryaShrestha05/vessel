@@ -2,6 +2,10 @@
   "name": "vessel",
   "version": "1.0.0",
   "description": "Terminal manager for the vibecoding era",
+  "author": {
+    "name": "Arya Shrestha",
+    "email": "aryashrestha@vessel.app"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
