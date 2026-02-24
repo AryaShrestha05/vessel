@@ -21,7 +21,6 @@ function getFirstLeafId(node: SplitNode): string {
   if (node.type === 'leaf') return node.terminalId
   return getFirstLeafId(node.children[0])
 }
-}
 
 function getDockSide(e: React.DragEvent, el: HTMLElement): DockSide | null {
   const r = el.getBoundingClientRect()
