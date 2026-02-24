@@ -103,7 +103,9 @@ jobs:
       - name: Upload Windows artifacts
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/**/*.exe
+          # Match only the top-level installer — not Electron's internal .exe files
+          files: dist/Vessel*.exe
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -131,7 +133,9 @@ jobs:
             libxtst6 \
             xvfb \
             rpm \
-            python3-setuptools
+            python3-setuptools \
+            fuse \
+            libfuse2
 
       - name: Install dependencies
         run: npm ci
