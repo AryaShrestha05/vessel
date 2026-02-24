@@ -84,9 +84,23 @@ export function useTerminal(
       // WebGL unavailable — xterm falls back to its canvas renderer automatically
     }
 
-    requestAnimationFrame(() => {
-      fitAddon.fit()
-    })
+    // Allotment (the split pane library) measures its panes asynchronously via
+    // its own ResizeObserver. A plain requestAnimationFrame fires on the very next
+    // frame — before Allotment has assigned real dimensions to the pane.
+    // fitAddon.fit() would then see a 0×0 container and size the terminal to
+    // 0 columns/rows. The WebGL canvas gets initialized at those zero dimensions
+    // and renders black. Retrying every ~16 ms until the container has real
+    // dimensions guarantees fit() runs with the correct size.
+    let fitCancelled = false
+    const tryFit = (attempt = 0) => {
+      if (fitCancelled || !container.isConnected) return
+      if (container.clientWidth > 0 && container.clientHeight > 0) {
+        fitAddon.fit()
+      } else if (attempt < 20) {
+        setTimeout(() => tryFit(attempt + 1), 16)
+      }
+    }
+    setTimeout(() => tryFit())
 
     // Replay buffered output so the terminal shows its history on remount
     // (e.g. after floating/docking the pane). On first mount this is a no-op.
@@ -133,6 +147,7 @@ export function useTerminal(
     resizeObserver.observe(container)
 
     return () => {
+      fitCancelled = true  // stop any pending fit retries
       resizeObserver.disconnect()
       unsubData()
       unsubExit()
