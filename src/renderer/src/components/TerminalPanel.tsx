@@ -56,15 +56,19 @@ export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onDragEnter={(e) => {
-        const payload = e.dataTransfer.types.includes('application/x-vessel-terminal')
-        if (!payload) return
+        const isTerminal = e.dataTransfer.types.includes('application/x-vessel-terminal')
+        const isWorkspace = e.dataTransfer.types.includes('application/x-vessel-workspace')
+        if (!isTerminal && !isWorkspace) return
+        e.stopPropagation()
         const side = getDockSide(e, e.currentTarget)
         setDockSide(side)
       }}
       onDragOver={(e) => {
-        const payload = e.dataTransfer.types.includes('application/x-vessel-terminal')
-        if (!payload) return
+        const isTerminal = e.dataTransfer.types.includes('application/x-vessel-terminal')
+        const isWorkspace = e.dataTransfer.types.includes('application/x-vessel-workspace')
+        if (!isTerminal && !isWorkspace) return
         e.preventDefault()
+        e.stopPropagation() // prevent ActiveStage from seeing this and showing "Swap to stage"
         e.dataTransfer.dropEffect = 'move'
         const side = getDockSide(e, e.currentTarget)
         setDockSide(side)
@@ -75,18 +79,34 @@ export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
         setDockSide(null)
       }}
       onDrop={(e) => {
-        const raw = e.dataTransfer.getData('application/x-vessel-terminal')
         setDockSide(null)
-        if (!raw) return
-        e.preventDefault()
-        try {
-          const data = JSON.parse(raw) as { workspaceId: string; terminalId: string }
-          if (!data.workspaceId || !data.terminalId) return
+
+        // ── Terminal → terminal dock (drag handle within the stage) ──────────
+        const terminalRaw = e.dataTransfer.getData('application/x-vessel-terminal')
+        if (terminalRaw) {
+          e.preventDefault()
+          e.stopPropagation()
+          try {
+            const data = JSON.parse(terminalRaw) as { workspaceId: string; terminalId: string }
+            if (!data.workspaceId || !data.terminalId) return
+            const side = getDockSide(e, e.currentTarget)
+            if (!side) return
+            dockTerminal(data.workspaceId, data.terminalId, workspaceId, terminalId, side)
+          } catch { /* ignore */ }
+          return
+        }
+
+        // ── Workspace card dock (drag from sidebar) ───────────────────────────
+        // Pull the first terminal out of the source workspace and split it into this pane.
+        const sourceWorkspaceId = e.dataTransfer.getData('application/x-vessel-workspace')
+        if (sourceWorkspaceId) {
+          e.preventDefault()
+          e.stopPropagation()
           const side = getDockSide(e, e.currentTarget)
           if (!side) return
-          dockTerminal(data.workspaceId, data.terminalId, workspaceId, terminalId, side)
-        } catch {
-          // ignore
+          const sourceWs = useTerminalStore.getState().workspaces.find((w) => w.id === sourceWorkspaceId)
+          if (!sourceWs || sourceWs.terminalIds.length === 0) return
+          dockTerminal(sourceWorkspaceId, sourceWs.terminalIds[0], workspaceId, terminalId, side)
         }
       }}
       className={`terminal-panel w-full h-full relative ${dockSide ? 'terminal-panel--docking' : ''}`}

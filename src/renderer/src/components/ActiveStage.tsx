@@ -71,12 +71,14 @@ export function ActiveStage({ workspace, visible }: ActiveStageProps) {
         '--status-color': statusColor,
         display: visible ? 'flex' : 'none',
       } as React.CSSProperties}
-      onDragOver={onStageDragOver}
-      onDragLeave={onStageDragLeave}
-      onDrop={onStageDrop}
     >
-      {/* Header */}
-      <div className="active-stage-header px-5 py-3.5">
+      {/* Header — drag workspace cards here to swap the active agent */}
+      <div
+        className="active-stage-header px-5 py-3.5 relative"
+        onDragOver={onStageDragOver}
+        onDragLeave={onStageDragLeave}
+        onDrop={onStageDrop}
+      >
         {/* Left: traffic lights + agent name + status */}
         <div className="flex items-center gap-3">
           {/* macOS-style traffic light buttons */}
@@ -134,14 +136,14 @@ export function ActiveStage({ workspace, visible }: ActiveStageProps) {
             &#8984;K
           </kbd>
         </div>
-      </div>
 
-      {/* Workspace-swap drop hint — shown when an agent card is dragged over */}
-      {workspaceDragOver && (
-        <div className="stage-workspace-drop-hint" aria-hidden="true">
-          <span className="stage-workspace-drop-label">Swap to stage</span>
-        </div>
-      )}
+        {/* Workspace-swap drop hint — fills header bar when an agent card is dragged over it */}
+        {workspaceDragOver && (
+          <div className="stage-workspace-drop-hint" aria-hidden="true">
+            <span className="stage-workspace-drop-label">Swap to stage</span>
+          </div>
+        )}
+      </div>
 
       {/* Terminal area */}
       {/* position: relative so FloatingTerminals are positioned relative to this container */}

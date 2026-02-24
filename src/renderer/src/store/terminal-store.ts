@@ -191,7 +191,7 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
       if (!workspace) return state
       const newRoot = removeFromTree(workspace.root, terminalId)
 
-      // Last pane closed — delete the whole workspace instead of spawning a new terminal
+      // Last docked pane closed — delete the whole workspace
       if (!newRoot) {
         const remaining = state.workspaces.filter((w) => w.id !== workspaceId)
         const newActiveId = state.activeAgentId === workspaceId
@@ -203,7 +203,13 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
       return {
         workspaces: state.workspaces.map((w) => {
           if (w.id !== workspaceId) return w
-          return { ...w, root: newRoot, terminalIds: w.terminalIds.filter((id) => id !== terminalId) }
+          return {
+            ...w,
+            root: newRoot,
+            terminalIds: w.terminalIds.filter((id) => id !== terminalId),
+            // Also evict from floatedPanes in case the terminal was floating
+            floatedPanes: w.floatedPanes.filter((p) => p.terminalId !== terminalId),
+          }
         }),
       }
     })
