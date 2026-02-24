@@ -372,9 +372,20 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
 
       const newWorkspaceId = uuidv4()
       const colorId = nextColorIndex++ % AGENT_HUES.length
+
+      // Auto-generate a unique name rather than inheriting the source workspace's
+      // name — otherwise every extracted terminal would be called "Claude" (or
+      // whatever the active workspace is named), which is confusing.
+      const existingNames = new Set(state.workspaces.map((w) => w.name))
+      let autoName = name
+      if (!autoName) {
+        let n = state.workspaces.length + 1
+        do { autoName = `Agent ${n++}` } while (existingNames.has(autoName))
+      }
+
       const newWorkspace: Workspace = {
         id: newWorkspaceId,
-        name: name ?? sourceWs.name,
+        name: autoName,
         root: { type: 'leaf', terminalId },
         terminalIds: [terminalId],
         status: 'idle',
