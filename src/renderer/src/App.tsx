@@ -59,6 +59,16 @@ function App(): React.JSX.Element {
   const hasWorkspaces = workspaces.length > 0
   const backgroundCount = sidebarAgents.length
 
+  // Safety net: if activeAgentId points to a deleted workspace (e.g. after a drag
+  // operation removes it), auto-promote the first remaining workspace so the stage
+  // never shows an empty black screen.
+  useEffect(() => {
+    if (workspaces.length === 0) return
+    if (!activeAgentId || !workspaces.find((w) => w.id === activeAgentId)) {
+      promoteAgent(workspaces[0].id)
+    }
+  }, [workspaces, activeAgentId, promoteAgent])
+
   // On first launch: open sidebar so the "New agent" input is visible.
   // When the first agent is created: close the sidebar so the terminal fills the view.
   useEffect(() => {

@@ -15,6 +15,14 @@ function countLeaves(node: SplitNode): number {
   return countLeaves(node.children[0]) + countLeaves(node.children[1])
 }
 
+// Returns the terminalId of the first DOCKED (non-floating) leaf in the tree.
+// Used instead of terminalIds[0] because terminalIds includes floating panes.
+function getFirstLeafId(node: SplitNode): string {
+  if (node.type === 'leaf') return node.terminalId
+  return getFirstLeafId(node.children[0])
+}
+}
+
 function getDockSide(e: React.DragEvent, el: HTMLElement): DockSide | null {
   const r = el.getBoundingClientRect()
   const x = (e.clientX - r.left) / Math.max(1, r.width)
@@ -37,6 +45,8 @@ export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
   const closePane = useTerminalStore((s) => s.closePane)
   const dockTerminal = useTerminalStore((s) => s.dockTerminal)
   const floatPane = useTerminalStore((s) => s.floatPane)
+  // Holds the off-screen ghost element so we can clean it up after drag ends
+  const dragGhostRef = useRef<HTMLDivElement | null>(null)
 
   // Float is only available when there is more than one terminal in the split tree
   const canFloat = useTerminalStore((s) => {
@@ -105,8 +115,11 @@ export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
           const side = getDockSide(e, e.currentTarget)
           if (!side) return
           const sourceWs = useTerminalStore.getState().workspaces.find((w) => w.id === sourceWorkspaceId)
-          if (!sourceWs || sourceWs.terminalIds.length === 0) return
-          dockTerminal(sourceWorkspaceId, sourceWs.terminalIds[0], workspaceId, terminalId, side)
+          if (!sourceWs) return
+          // Use the first DOCKED leaf, not terminalIds[0] — that array includes
+          // floating panes which are not in the split tree and can't be moved this way.
+          const sourceTerminalId = getFirstLeafId(sourceWs.root)
+          dockTerminal(sourceWorkspaceId, sourceTerminalId, workspaceId, terminalId, side)
         }
       }}
       className={`terminal-panel w-full h-full relative ${dockSide ? 'terminal-panel--docking' : ''}`}
@@ -138,6 +151,28 @@ export function TerminalPanel({ terminalId, workspaceId }: TerminalPanelProps) {
               JSON.stringify({ workspaceId, terminalId })
             )
             e.dataTransfer.setData('text/plain', `${workspaceId}:${terminalId}`)
+
+            // Supply a lightweight drag ghost so the browser never tries to screenshot
+            // the terminal panel — that screenshot includes the WebGL canvas, which reads
+            // back as blank from the CPU and can trigger WebGL context loss → black screen.
+            const ghost = document.createElement('div')
+            ghost.style.cssText = [
+              'position:fixed', 'top:-200px',
+              'padding:5px 10px', 'border-radius:6px',
+              'background:rgba(129,140,248,0.15)',
+              'border:1px solid rgba(129,140,248,0.4)',
+              'color:#f0f0f5', 'font-size:12px', 'font-weight:600',
+              "font-family:'Geist Mono',monospace",
+              'white-space:nowrap', 'pointer-events:none',
+            ].join(';')
+            ghost.textContent = 'Terminal'
+            document.body.appendChild(ghost)
+            dragGhostRef.current = ghost
+            e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 20)
+          }}
+          onDragEnd={() => {
+            dragGhostRef.current?.remove()
+            dragGhostRef.current = null
           }}
           title="Drag to move/split"
           className="terminal-toolbar-btn terminal-toolbar-btn-drag"
