@@ -1693,6 +1693,8 @@ body {
   border-bottom: 1px solid var(--border-primary);
   cursor: default;
   user-select: none;
+  position: relative;
+  z-index: 2;
 }
 
 .grid-cell-dot {
