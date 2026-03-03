@@ -4,6 +4,7 @@ import { useThemeStore } from './store/theme-store'
 import { useUIStore } from './store/ui-store'
 import { ActiveStage } from './components/ActiveStage'
 import { AgentDeck } from './components/AgentDeck'
+import { GridView } from './components/GridView'
 import { ColorBends } from './components/ColorBends'
 import '@xterm/xterm/css/xterm.css'
 
@@ -16,6 +17,8 @@ function App(): React.JSX.Element {
   const agentsOpen = useUIStore((s) => s.sidebarOpen)
   const setAgentsOpen = useUIStore((s) => s.setSidebarOpen)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
+  const viewMode = useUIStore((s) => s.viewMode)
+  const toggleViewMode = useUIStore((s) => s.toggleViewMode)
   const [entered, setEntered] = useState(false)
   const hasEverHadWorkspaces = useRef(false)
 
@@ -122,6 +125,32 @@ function App(): React.JSX.Element {
           Vessel
         </span>
         <div className="flex items-center gap-2">
+          {/* Grid / Focus view toggle */}
+          {hasWorkspaces && workspaces.length > 1 && (
+            <button
+              type="button"
+              className="titlebar-menu-btn"
+              onClick={toggleViewMode}
+              title={viewMode === 'focus' ? 'Grid view' : 'Focus view'}
+            >
+              {viewMode === 'focus' ? (
+                /* 4-square grid icon */
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+                  <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+                  <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+                  <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+                </svg>
+              ) : (
+                /* Single square icon */
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.4" />
+                </svg>
+              )}
+            </button>
+          )}
+
+          {/* Sidebar toggle */}
           <button
             type="button"
             className="titlebar-menu-btn"
@@ -144,33 +173,42 @@ function App(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Focus & Periphery Layout */}
+      {/* Main Layout */}
       <div className={`app-layout flex-1 min-h-0 p-4 pt-2 enter enter--2 ${entered ? 'enter--in' : ''}`}>
-        {/* Active Stage (~70%) - render ALL workspaces, toggle visibility */}
-        <div className="app-stage min-w-0 relative">
-          {!hasWorkspaces && (
-            <div className="w-full h-full flex flex-col items-center justify-center animate-fade-in">
-              <div className="empty-state-icon">&#9002;_</div>
-              <p className="empty-state-text">Create an agent to get started</p>
-            </div>
-          )}
+        {viewMode === 'grid' && hasWorkspaces ? (
+          /* Grid View — all agents visible simultaneously */
+          <div className="app-stage min-w-0 relative">
+            <GridView workspaces={workspaces} />
+          </div>
+        ) : (
+          /* Focus & Periphery Layout */
+          <div className="app-stage min-w-0 relative">
+            {!hasWorkspaces && (
+              <div className="w-full h-full flex flex-col items-center justify-center animate-fade-in">
+                <div className="empty-state-icon">&#9002;_</div>
+                <p className="empty-state-text">Create an agent to get started</p>
+              </div>
+            )}
 
-          {workspaces.map((workspace) => (
-            <ActiveStage
-              key={workspace.id}
-              workspace={workspace}
-              visible={workspace.id === activeAgentId}
-            />
-          ))}
-        </div>
+            {workspaces.map((workspace) => (
+              <ActiveStage
+                key={workspace.id}
+                workspace={workspace}
+                visible={workspace.id === activeAgentId}
+              />
+            ))}
+          </div>
+        )}
 
-        {/* Agent Deck Sidebar */}
-        <div className={`agent-deck-sidebar agent-sidebar enter enter--3 ${entered ? 'enter--in' : ''} ${agentsOpen ? 'agent-sidebar--open' : ''}`}>
-          <AgentDeck agents={sidebarAgents} />
-        </div>
+        {/* Agent Deck Sidebar — hidden in grid mode */}
+        {viewMode === 'focus' && (
+          <div className={`agent-deck-sidebar agent-sidebar enter enter--3 ${entered ? 'enter--in' : ''} ${agentsOpen ? 'agent-sidebar--open' : ''}`}>
+            <AgentDeck agents={sidebarAgents} />
+          </div>
+        )}
 
-        {/* Minimal edge handle when sidebar is hidden */}
-        {!agentsOpen && backgroundCount > 0 && (
+        {/* Minimal edge handle when sidebar is hidden (focus mode only) */}
+        {viewMode === 'focus' && !agentsOpen && backgroundCount > 0 && (
           <button
             type="button"
             className="agent-sidebar-handle"
